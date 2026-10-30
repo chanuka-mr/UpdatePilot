@@ -1,5 +1,20 @@
 # UpdatePilot frontend
 
+## Screen routes and source structure
+
+- `/`: overview.
+- `/applications`: searchable and paginated installed applications.
+- `/applications/google-chrome`: application details (other demo IDs are supported).
+- `/updates`: searchable available updates.
+- `/updates/google-chrome`: update preview and confirmation.
+- `/updates/google-chrome/progress`: installation and result-state previews.
+- `/history`: activity filters, event detail dialog, and sample JSON exports.
+- `/security` and `/settings`: supporting preview pages.
+
+`app/` contains route entry points. `components/layout/` owns the shared responsive navigation shell, `components/ui/` contains reusable display controls, `features/` owns inventory, updates, and history behavior, and `lib/demo-data.ts` holds illustrative records. Browser navigation and deep links are supported. Unknown application IDs return 404.
+
+All screens are labelled as sample data. Scan previews and update flows do not call the agent or backend, and the progress outcome selector does not run an installer. History exports contain illustrative records. Database/API wiring is intentionally deferred for this UI milestone. Filters and preview preferences are local page state.
+
 Next.js App Router, TypeScript, and Tailwind CSS implementation of `../example`.
 
 ## Run locally
