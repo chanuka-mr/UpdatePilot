@@ -1,1 +1,1 @@
-import {OverviewScreen} from "../features/inventory/screens"; export default function Page(){return <OverviewScreen/>;}
+import {LiveOverview} from "../features/inventory/live-overview"; export default function Page(){return <LiveOverview/>;}

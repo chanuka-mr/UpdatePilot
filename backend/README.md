@@ -1,5 +1,15 @@
 # UpdatePilot PostgreSQL backend
 
+## Read-only dashboard API
+
+The overview now reads the latest imported scan through `GET /api/v1/dashboard`. This local development API binds to `127.0.0.1:4010` and requires a bearer token. It serves only the device selected by backend `DEVICE_KEY` (default `local-pc`). It is not a multi-user authentication or pairing system and must not be exposed publicly.
+
+From `backend`, run `node scripts/configure-local-api.mjs` once. It generates matching private API tokens in backend `.env` and frontend `.env.local` without printing them or changing database credentials. Then start `npm run dev` in backend and `npm run dev` in frontend in separate terminals. Restart both after configuration changes. The frontend server proxies `/api/dashboard`; the browser never receives the backend credential or database URL.
+
+The overview handles loading, unavailable backend/database, missing scans, failed catalog scans, and scans older than 24 hours. No scan jobs or installations are executed. Other frontend pages remain labelled samples for now. Update counts are unknown for failed/unrequested WinGet scans. Preview rows do not infer approved target versions from available catalog versions.
+
+Verify the overview against `npm run db:summary -- --device-key local-pc`. A different device key requires changing backend `DEVICE_KEY`, not passing arbitrary device identifiers from a browser.
+
 This milestone stores the agent's JSON snapshot in a local PostgreSQL database using TypeScript and Prisma ORM 7. It has a local command-line importer, not an HTTP server. The browser and agent do not receive database credentials. Automatic uploads, pairing, and frontend APIs are later milestones.
 
 ## 1. Create a dedicated local database

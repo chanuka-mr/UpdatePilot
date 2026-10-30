@@ -1,5 +1,13 @@
 # UpdatePilot frontend
 
+## PostgreSQL overview
+
+The `/` overview now loads the latest imported scan through the private local backend API. Other screens still use labelled demo data. From `backend`, run `node scripts/configure-local-api.mjs` once, then `npm run dev`. In a separate terminal start this frontend with `npm run dev` and open `http://localhost:3000`. The API uses the backend `DEVICE_KEY` (default `local-pc`). No browser database connection is required.
+
+The overview's refresh button reloads stored database data; it does not run the Windows agent. Import a fresh scan using the backend CLI to update the data. Counts from a failed or unrequested WinGet scan are shown as unknown. Catalog version arrays are not treated as approved installation targets. The live agent status remains unknown until pairing and heartbeat support exists.
+
+The API secret is server-only in `.env.local`; never use a `NEXT_PUBLIC_` prefix. Both servers bind to loopback for this local development milestone. Multi-user authorization and remote deployment are not implemented. Restart servers after changing environment files.
+
 ## Screen routes and source structure
 
 - `/`: overview.
