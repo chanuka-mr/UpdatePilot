@@ -157,3 +157,6 @@ example/
 agent/**/bin/
 agent/**/obj/
 agent/**/data/
+
+# Generated Prisma client
+backend/generated/

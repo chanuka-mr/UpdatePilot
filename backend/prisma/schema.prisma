@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Device {
+  id        String              @id @default(uuid()) @db.Uuid
+  key       String              @unique
+  name      String
+  createdAt DateTime            @default(now()) @db.Timestamptz(3)
+  scans     InventorySnapshot[]
+}
+
+model InventorySnapshot {
+  id           String                @id @default(uuid()) @db.Uuid
+  deviceId     String                @db.Uuid
+  device       Device                @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  scannedAt    DateTime              @db.Timestamptz(3)
+  importedAt   DateTime              @default(now()) @db.Timestamptz(3)
+  contentHash  String
+  wingetStatus String
+  warnings     Json
+  raw          Json
+  applications RegistryApplication[]
+  packages     WinGetPackage[]
+
+  @@unique([deviceId, contentHash])
+  @@unique([deviceId, scannedAt])
+  @@index([deviceId, scannedAt(sort: Desc)])
+}
+
+model RegistryApplication {
+  id               String            @id @default(uuid()) @db.Uuid
+  snapshotId       String            @db.Uuid
+  snapshot         InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  name             String
+  installedVersion String?
+  publisher        String?
+  scope            String
+  registryView     String
+  registryPath     String
+  discoverySource  String
+  matchStatus      String
+
+  @@unique([snapshotId, scope, registryView, registryPath])
+  @@index([snapshotId, name])
+}
+
+model WinGetPackage {
+  id                String            @id @default(uuid()) @db.Uuid
+  snapshotId        String            @db.Uuid
+  snapshot          InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  packageId         String
+  name              String
+  installedVersion  String?
+  source            String?
+  isUpdateAvailable Boolean
+  availableVersions String[]
+  matchStatus       String
+
+  @@index([snapshotId, isUpdateAvailable])
+  @@index([snapshotId, packageId])
+}

@@ -24,6 +24,8 @@ This launches the bundled fixed script in Windows PowerShell, queries the `winge
 
 The result preserves package IDs, installed versions, WinGet's update-availability judgment, available catalog versions, module version, and scan timestamp. Available versions may include older releases; no target version is automatically selected. Registry entries remain unmatched: the two discovery sources must not be joined by display-name similarity. Counts refer to different sets of registrations and packages and must not be added together.
 
+WinGet may return installed ARP and MSIX entries with an empty source even when querying `-Source winget`. These are retained with `matchStatus: "unmatched"`; source-matched entries have `matchStatus: "matched"`. An unmatched entry with `isUpdateAvailable: false` means no update is known through the queried catalog, not that the application is up to date. Unexpected nonempty sources and update claims without a source are still rejected. WinGet's package count can include Store/MSIX registrations beyond the separate desktop registry scan.
+
 Inspect update candidates in PowerShell:
 
 ```powershell

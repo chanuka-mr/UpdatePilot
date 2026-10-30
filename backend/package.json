@@ -1,0 +1,31 @@
+{
+  "name": "updatepilot-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:check": "tsx src/cli.ts check",
+    "db:import": "tsx src/cli.ts import",
+    "db:summary": "tsx src/cli.ts summary",
+    "db:studio": "prisma studio",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/inventory.test.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "dotenv": "^17.0.0",
+    "pg": "^8.16.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.15.0",
+    "prisma": "^7.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

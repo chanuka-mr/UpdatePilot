@@ -7,3 +7,5 @@ cd frontend
 npm install
 npm run dev
 ```
+
+The read-only Windows scanner lives in [`agent`](agent/README.md). PostgreSQL setup and scan import commands are in [`backend`](backend/README.md).

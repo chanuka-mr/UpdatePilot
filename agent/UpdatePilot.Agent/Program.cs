@@ -107,6 +107,7 @@ if (winget.Inventory is { } packageInventory)
 {
     var updates = packageInventory.Packages.Where(package => package.IsUpdateAvailable).ToList();
     Console.WriteLine($"\nWinGet: {packageInventory.Packages.Count} package entries; {updates.Count} have updates available.");
+    Console.WriteLine($"Catalog matched: {packageInventory.Packages.Count(package => package.MatchStatus == "matched")} | Unmatched: {packageInventory.Packages.Count(package => package.MatchStatus == "unmatched")}");
     foreach (var package in updates)
         Console.WriteLine($"{package.Name} | {package.Id} | Installed: {package.InstalledVersion ?? "unknown"} | Update available");
     Console.WriteLine("Catalog versions are saved in winget.inventory.packages in the JSON snapshot.");

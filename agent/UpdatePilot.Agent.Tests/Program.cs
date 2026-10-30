@@ -25,6 +25,31 @@ var tests = new (string Name, Action Run)[]
             """).Packages.Count == 0)),
     ("Rejects incomplete scans instead of reporting zero updates", () => Reject("{}")),
     ("Rejects unexpected package sources", () => Reject(sample.Replace("\"source\":\"winget\"", "\"source\":\"untrusted\""))),
+    ("Preserves unmatched entries with no catalog source", () =>
+    {
+        var unmatched = sample.Replace("\"source\":\"winget\"", "\"source\":\"\"")
+            .Replace("\"isUpdateAvailable\":true", "\"isUpdateAvailable\":false");
+        var inventory = WinGetScanner.Parse(unmatched);
+        Require(inventory.Packages.Count == 2);
+        Require(inventory.Packages.All(package => package.MatchStatus == "unmatched" && !package.IsUpdateAvailable));
+        Require(WinGetScanner.Parse(unmatched.Replace("\"source\":\"\"", "\"source\":null"))
+            .Packages.All(package => package.MatchStatus == "unmatched"));
+    }),
+    ("Rejects update claims without a catalog match", () => Reject(sample.Replace("\"source\":\"winget\"", "\"source\":\"\""))),
+    ("Retains matched updates alongside unmatched ARP and MSIX entries", () =>
+    {
+        const string mixed = """
+        {"schemaVersion":1,"scannedAt":"2026-10-30T10:00:00Z","moduleVersion":"1.0.0","packages":[
+          {"name":"Docker Desktop","id":"Docker.DockerDesktop","installedVersion":"4.69.0","source":"winget","isUpdateAvailable":true,"availableVersions":["4.97.0"]},
+          {"name":"Unmatched desktop app","id":"ARP\\Machine\\X64\\Example","installedVersion":"1.0","source":"","isUpdateAvailable":false,"availableVersions":[]},
+          {"name":"Unmatched Store app","id":"MSIX\\Example","installedVersion":"1.0","source":"","isUpdateAvailable":false,"availableVersions":[]}
+        ]}
+        """;
+        var inventory = WinGetScanner.Parse(mixed);
+        Require(inventory.Packages.Count(package => package.MatchStatus == "matched") == 1);
+        Require(inventory.Packages.Count(package => package.MatchStatus == "unmatched") == 2);
+        Require(inventory.Packages.Single(package => package.IsUpdateAvailable).Id == "Docker.DockerDesktop");
+    }),
     ("Rejects missing update status", () => Reject(sample.Replace("\"isUpdateAvailable\":true,", ""))),
     ("Rejects contaminated JSON output", () => Reject("Warning: failed\n" + sample))
 };

@@ -60,13 +60,21 @@ internal static class WinGetScanner
         if (inventory.SchemaVersion != 1 || inventory.ScannedAt == default ||
             string.IsNullOrWhiteSpace(inventory.ModuleVersion) || inventory.Packages is null)
             throw new JsonException("WinGet returned an incomplete or unsupported inventory.");
-        foreach (var package in inventory.Packages)
+        for (var index = 0; index < inventory.Packages.Count; index++)
         {
+            var package = inventory.Packages[index];
             if (package is null || string.IsNullOrWhiteSpace(package.Id) ||
-                string.IsNullOrWhiteSpace(package.Name) ||
-                !string.Equals(package.Source, "winget", StringComparison.OrdinalIgnoreCase) ||
-                package.AvailableVersions is null || package.AvailableVersions.Any(string.IsNullOrWhiteSpace))
-                throw new JsonException("WinGet returned an invalid package record.");
+                string.IsNullOrWhiteSpace(package.Name))
+                throw new JsonException($"WinGet record {index + 1} is missing its name or identifier.");
+            if (package.AvailableVersions is null || package.AvailableVersions.Any(string.IsNullOrWhiteSpace))
+                throw new JsonException($"WinGet record {index + 1} has an invalid catalog version list.");
+            // Source limits the catalog used for correlation, not every installed
+            // entry returned by WinGet. ARP/MSIX entries may have no catalog match.
+            if (!string.IsNullOrWhiteSpace(package.Source) &&
+                !string.Equals(package.Source, "winget", StringComparison.OrdinalIgnoreCase))
+                throw new JsonException($"WinGet record {index + 1} has an unexpected catalog source.");
+            if (package.MatchStatus == "unmatched" && package.IsUpdateAvailable)
+                throw new JsonException($"WinGet record {index + 1} claims an update without a catalog source.");
         }
         // Preserve WinGet's version strings and update judgment. AvailableVersions
         // includes historical releases; it is not a list of approved update targets.
@@ -75,8 +83,12 @@ internal static class WinGetScanner
 }
 
 internal record WinGetPackage(
-    string Name, string Id, string? InstalledVersion, string Source,
-    [property: JsonRequired] bool IsUpdateAvailable, List<string> AvailableVersions);
+    string Name, string Id, string? InstalledVersion, string? Source,
+    [property: JsonRequired] bool IsUpdateAvailable, List<string> AvailableVersions)
+{
+    public string MatchStatus => string.Equals(Source, "winget", StringComparison.OrdinalIgnoreCase)
+        ? "matched" : "unmatched";
+}
 
 internal record WinGetInventory(
     int SchemaVersion, DateTimeOffset ScannedAt, string ModuleVersion, List<WinGetPackage> Packages);
