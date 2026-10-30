@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-export async function proxyCatalog(request: Request, endpoint: 'applications' | 'updates') {
+export async function proxyCatalog(request: Request, endpoint: 'applications' | 'updates' | 'history') {
   const url = new URL(request.url);
   if (!['localhost','127.0.0.1','[::1]'].includes(url.hostname) || (request.headers.get('origin') && request.headers.get('origin') !== url.origin))
     return NextResponse.json({ error: 'Local same-origin access required.' }, { status: 403 });

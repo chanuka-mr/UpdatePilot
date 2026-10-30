@@ -56,5 +56,22 @@ try {
   const listProxy = await proxyCatalog(new Request('http://localhost:3000/api/updates?pageSize=5'), 'updates');
   assert.equal(listProxy.status, 200); assert.equal((await listProxy.json()).total, data.updatesAvailable);
   console.log('Live inventory counts, search, pagination, source separation, parameter validation, and proxy passed.');
+  const history = await catalog('history?pageSize=1');
+  assert.ok(history.total > 0);
+  assert.equal(history.rows.length,1); assert.equal(history.rows[0].type,'SCAN');
+  assert.equal(history.rows[0].id,data.snapshotId); assert.equal(history.rows[0].registryEntries,data.registryEntries);
+  assert.equal(history.rows[0].updatesAvailable,data.updatesAvailable);
+  assert.equal('raw' in history.rows[0],false); assert.equal('warnings' in history.rows[0],false);
+  const detail = await catalog(`history?id=${history.rows[0].id}`);
+  assert.equal(detail.total,1); assert.ok(Array.isArray(detail.rows[0].warnings));
+  const filtered = await catalog(`history?status=${history.rows[0].wingetStatus}&q=${history.rows[0].id}`);
+  assert.equal(filtered.total,1);
+  const absent = await catalog('history?id=00000000-0000-4000-8000-000000000001');
+  assert.equal(absent.total,0); assert.equal(absent.state,'empty');
+  const historyProxy = await proxyCatalog(new Request('http://localhost:3000/api/history?pageSize=1'),'history');
+  assert.equal(historyProxy.status,200); assert.equal((await historyProxy.json()).rows[0].id,data.snapshotId);
+  const badHistory = await fetch(`http://127.0.0.1:${port}/api/v1/history?id=invalid`,{headers});
+  assert.equal(badHistory.status,400);
+  console.log('Live history list, details, status/search filters, missing scan, and proxy checks passed.');
   console.log(JSON.stringify({ authentication: 'passed', readOnly: 'passed', state: data.state, registryEntries: data.registryEntries, wingetEntries: data.wingetEntries, updatesAvailable: data.updatesAvailable }, null, 2));
 } finally { child.kill(); }

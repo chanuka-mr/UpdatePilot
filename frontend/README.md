@@ -1,14 +1,18 @@
 # UpdatePilot frontend
 
+## Connected scan history
+
+`/history` now uses PostgreSQL through `/api/history`. Search accepts a device name or full scan UUID; filters target WinGet state. Ten-row pages can be ordered by scan time. Details show the real scan/import times, separate inventory counts, unknown catalog counts for incomplete scans, and recorded warnings. Export this page downloads only the currently visible filtered page; Export scan details includes one record and its diagnostics. Exports contain private local inventory metadata. No fabricated update events, hashes, or traces appear on the live history screen. No migration is required.
+
 ## Connected application and update lists
 
 `/applications` and `/updates` now use the local backend and PostgreSQL through server-only proxies. Applications provides separate Desktop registry and WinGet inventory tabs. Search, filters, textual sorting, and ten-row pagination execute on the backend. An inline native dialog displays the selected stored registration/package without linking to the illustrative update installer. Available catalog versions may be historical releases and are not approved update targets. All lists handle loading, errors, no scan, no matches, unavailable WinGet data, and stale scans. Refresh reloads stored data only.
 
-Standalone `/applications/[id]`, `/updates/[id]`, progress, and history routes remain labelled demo screens. They are not used as destinations from real inventory records. Both backend and frontend must be running; no additional migration is required for this milestone.
+Standalone `/applications/[id]`, `/updates/[id]`, and progress routes remain labelled demo screens. They are not used as destinations from real inventory records. Both backend and frontend must be running; no additional migration is required for this milestone.
 
 ## PostgreSQL overview
 
-The `/` overview now loads the latest imported scan through the private local backend API. Other screens still use labelled demo data. From `backend`, run `node scripts/configure-local-api.mjs` once, then `npm run dev`. In a separate terminal start this frontend with `npm run dev` and open `http://localhost:3000`. The API uses the backend `DEVICE_KEY` (default `local-pc`). No browser database connection is required.
+The `/` overview now loads the latest imported scan through the private local backend API. Standalone detail, preview, and progress screens still use labelled demo data. From `backend`, run `node scripts/configure-local-api.mjs` once, then `npm run dev`. In a separate terminal start this frontend with `npm run dev` and open `http://localhost:3000`. The API uses the backend `DEVICE_KEY` (default `local-pc`). No browser database connection is required.
 
 The overview's refresh button reloads stored database data; it does not run the Windows agent. Import a fresh scan using the backend CLI to update the data. Counts from a failed or unrequested WinGet scan are shown as unknown. Catalog version arrays are not treated as approved installation targets. The live agent status remains unknown until pairing and heartbeat support exists.
 

@@ -34,7 +34,7 @@ export function LiveOverview() {
       <section className="panel overflow-hidden"><div className="p-6"><h2 className="text-xl font-semibold">Available Updates</h2><p className="mt-2 text-xs text-muted">First five matched update candidates from the stored scan. Installation targets still require a separate verified preview.</p></div>
         {data.updatePreview.length ? <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>Application</th><th>Package ID</th><th>Installed version</th><th>Status</th></tr></thead><tbody>{data.updatePreview.map(app => <tr key={app.id}><td><div className="flex items-center gap-3"><AppIcon name={app.name}/><strong>{app.name}</strong></div></td><td className="font-mono text-xs text-muted">{app.packageId}</td><td><span className="version">{app.installedVersion || 'Unknown'}</span></td><td className="whitespace-nowrap text-xs text-primary">Update available</td></tr>)}</tbody></table></div> : <p className="px-6 pb-6 text-muted">{data.wingetStatus === 'completed' ? 'No matched update candidates in this scan.' : 'Update information is unavailable for this scan.'}</p>}
       </section>
-      <p className="text-xs text-muted">Refresh reloads PostgreSQL data; it does not start an agent scan. Application and update lists use stored scan data. Standalone update-review and history pages remain labelled demos.</p>
+      <p className="text-xs text-muted">Refresh reloads PostgreSQL data; it does not start an agent scan. Application and update lists use stored scan data. History shows imported scans. Standalone update-review screens remain labelled demos.</p>
     </>}
   </>;
 }

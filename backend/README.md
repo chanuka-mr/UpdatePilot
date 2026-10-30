@@ -1,5 +1,11 @@
 # UpdatePilot PostgreSQL backend
 
+## Imported scan history
+
+`GET /api/v1/history` provides device-scoped scan history only. Parameters: `q` (device name or exact full scan UUID), `status` (`all`, `completed`, `failed`, `not-requested`), `direction` (`asc`/`desc` by scan time), `page`, `pageSize` (max 100), and optional exact scan `id`. Unknown/duplicate parameters are rejected. Scan ID lookups still require the configured device key. Totals, paging, and counts run in one repeatable-read transaction. Lists expose warning counts; exact ID lookups additionally return recorded warnings. Raw snapshot payloads, registry paths, and credentials are not returned.
+
+Completed WinGet results with registry/source warnings are labelled Completed with Warnings. Failed WinGet results retain the successful registry count and unknown catalog/update counts. Registry-only scans are distinct from fully completed scans. History contains imported snapshots, not every scan ever run: failed imports, agent jobs, and update executions are not recorded by this milestone.
+
 ## Inventory list APIs
 
 The same authenticated local server now provides `GET /api/v1/applications` and `GET /api/v1/updates`. Both are pinned to backend `DEVICE_KEY` and the latest scan by scan timestamp. No request can select another device. Supported query parameters are `q` (up to 200 characters), `page` (1–100000), `pageSize` (1–100), `source` (`registry` or `winget`), `status` (`all`, `update`, `matched`, `unmatched`), `sort` (`name` or `installedVersion`), and `direction` (`asc` or `desc`). Unknown or duplicate query parameters are rejected. Installed version sorting is textual, not semantic version ordering.
