@@ -30,5 +30,31 @@ try {
   const forbidden = await GET(new Request('http://untrusted.example/api/dashboard'));
   assert.equal(forbidden.status, 403);
   console.log('Frontend proxy and local-origin checks passed.');
+  const catalog = async path => {
+    const res = await fetch(`http://127.0.0.1:${port}/api/v1/${path}`, { headers });
+    assert.equal(res.status, 200); return res.json();
+  };
+  const registry = await catalog('applications?pageSize=5');
+  assert.equal(registry.total, data.registryEntries); assert.ok(registry.rows.length <= 5);
+  assert.ok(registry.rows.every(row => row.status === 'unmatched' && row.packageId === null));
+  const packages = await catalog('applications?source=winget&pageSize=5');
+  assert.equal(packages.total, data.wingetEntries);
+  const updates = await catalog('updates?pageSize=5');
+  assert.equal(updates.total, data.updatesAvailable);
+  assert.ok(updates.rows.every(row => row.source === 'winget' && row.status === 'update'));
+  if (registry.total > 5) {
+    const next = await catalog('applications?pageSize=5&page=2');
+    assert.equal(next.page, 2); assert.ok(next.rows.every(row => !registry.rows.some(first => first.id === row.id)));
+  }
+  if (updates.rows.length) {
+    const found = await catalog(`updates?q=${encodeURIComponent(updates.rows[0].packageId)}&direction=desc`);
+    assert.ok(found.rows.some(row => row.packageId === updates.rows[0].packageId));
+  }
+  const invalid = await fetch(`http://127.0.0.1:${port}/api/v1/applications?pageSize=101`, { headers });
+  assert.equal(invalid.status, 400);
+  const { proxyCatalog } = await import('../../frontend/lib/backend-proxy.ts');
+  const listProxy = await proxyCatalog(new Request('http://localhost:3000/api/updates?pageSize=5'), 'updates');
+  assert.equal(listProxy.status, 200); assert.equal((await listProxy.json()).total, data.updatesAvailable);
+  console.log('Live inventory counts, search, pagination, source separation, parameter validation, and proxy passed.');
   console.log(JSON.stringify({ authentication: 'passed', readOnly: 'passed', state: data.state, registryEntries: data.registryEntries, wingetEntries: data.wingetEntries, updatesAvailable: data.updatesAvailable }, null, 2));
 } finally { child.kill(); }

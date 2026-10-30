@@ -1,5 +1,11 @@
 # UpdatePilot frontend
 
+## Connected application and update lists
+
+`/applications` and `/updates` now use the local backend and PostgreSQL through server-only proxies. Applications provides separate Desktop registry and WinGet inventory tabs. Search, filters, textual sorting, and ten-row pagination execute on the backend. An inline native dialog displays the selected stored registration/package without linking to the illustrative update installer. Available catalog versions may be historical releases and are not approved update targets. All lists handle loading, errors, no scan, no matches, unavailable WinGet data, and stale scans. Refresh reloads stored data only.
+
+Standalone `/applications/[id]`, `/updates/[id]`, progress, and history routes remain labelled demo screens. They are not used as destinations from real inventory records. Both backend and frontend must be running; no additional migration is required for this milestone.
+
 ## PostgreSQL overview
 
 The `/` overview now loads the latest imported scan through the private local backend API. Other screens still use labelled demo data. From `backend`, run `node scripts/configure-local-api.mjs` once, then `npm run dev`. In a separate terminal start this frontend with `npm run dev` and open `http://localhost:3000`. The API uses the backend `DEVICE_KEY` (default `local-pc`). No browser database connection is required.

@@ -1,5 +1,13 @@
 # UpdatePilot PostgreSQL backend
 
+## Inventory list APIs
+
+The same authenticated local server now provides `GET /api/v1/applications` and `GET /api/v1/updates`. Both are pinned to backend `DEVICE_KEY` and the latest scan by scan timestamp. No request can select another device. Supported query parameters are `q` (up to 200 characters), `page` (1–100000), `pageSize` (1–100), `source` (`registry` or `winget`), `status` (`all`, `update`, `matched`, `unmatched`), `sort` (`name` or `installedVersion`), and `direction` (`asc` or `desc`). Unknown or duplicate query parameters are rejected. Installed version sorting is textual, not semantic version ordering.
+
+Applications defaults to desktop registry entries; these remain unmatched. WinGet inventory is a separate view. Updates always queries matched WinGet update candidates regardless of the supplied source/status. Source-specific counts, rows, and latest-scan selection run in a repeatable-read transaction, with a stable ID sort tiebreaker. Out-of-range pages clamp to the last available page. Failed/unrequested WinGet scans return `state: unavailable` and `total: null`, not zero updates. Only the selected page's records are returned. The API never returns registry paths, raw snapshots, or database credentials.
+
+Run `node --import tsx scripts/smoke-dashboard.mjs` with your local database configured to check live counts, pagination, search, invalid parameters, authentication, and the frontend proxies. No database writes or installations occur.
+
 ## Read-only dashboard API
 
 The overview now reads the latest imported scan through `GET /api/v1/dashboard`. This local development API binds to `127.0.0.1:4010` and requires a bearer token. It serves only the device selected by backend `DEVICE_KEY` (default `local-pc`). It is not a multi-user authentication or pairing system and must not be exposed publicly.

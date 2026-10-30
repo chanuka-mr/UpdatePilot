@@ -1,2 +1,1 @@
-import {InventoryScreen} from "../../features/inventory/screens";
-export default function Page(){return <InventoryScreen/>;}
+import {LiveCatalog} from "../../features/inventory/live-catalog"; export default function Page(){return <LiveCatalog/>;}

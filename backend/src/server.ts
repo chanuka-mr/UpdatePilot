@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 import { createDatabase } from "./database.js";
 import { summarizePackages } from "./dashboard.js";
+import { readCatalog } from "./catalog.js";
 
 const db = createDatabase();
 const token = process.env.BACKEND_API_TOKEN;
@@ -20,7 +21,16 @@ const server = createServer(async (req, res) => {
   const expected = Buffer.from(`Bearer ${token}`);
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { send(401, { error: "Unauthorized" }); return; }
   if (req.method !== "GET") { res.setHeader("Allow", "GET"); send(405, { error: "Read-only API" }); return; }
-  if (req.url !== "/api/v1/dashboard") { send(404, { error: "Not found" }); return; }
+  const url = new URL(req.url || '/', 'http://127.0.0.1');
+  if (!['/api/v1/dashboard', '/api/v1/applications', '/api/v1/updates'].includes(url.pathname)) { send(404, { error: "Not found" }); return; }
+  if (url.pathname !== '/api/v1/dashboard') {
+    try { send(200, await readCatalog(db, deviceKey, url.searchParams, url.pathname === '/api/v1/updates')); }
+    catch (error) {
+      if (error instanceof Error && (error.name === 'ZodError' || error.message === 'Duplicate query parameter' || error.message.startsWith('Registry entries'))) send(400, { error: 'Invalid search, filter, sorting, or pagination parameters.' });
+      else send(503, { error: 'Inventory database unavailable. Check the database connection and migrations.' });
+    }
+    return;
+  }
   try {
     const scan = await db.$transaction(tx => tx.inventorySnapshot.findFirst({
       where: { device: { key: deviceKey } }, orderBy: { scannedAt: "desc" },
