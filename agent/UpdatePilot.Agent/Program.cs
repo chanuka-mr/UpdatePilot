@@ -3,6 +3,9 @@ using System.Text.Json;
 using Microsoft.Win32;
 using UpdatePilot.Agent;
 
+if (args.Length == 1 && args[0] is "--pair" or "--listen")
+    return await AgentConnection.RunAsync(args[0]);
+
 // Read-only discovery. WinGet source queries are explicitly enabled by a CLI flag.
 if (args.Any(argument => argument != "--with-winget"))
 {

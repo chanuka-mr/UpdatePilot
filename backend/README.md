@@ -1,5 +1,17 @@
 # UpdatePilot PostgreSQL backend
 
+## Agent pairing and scan jobs
+
+Additive migrations introduce `AgentCredential`, `PairingTicket`, and `ScanJob`. Run `npm run db:generate` and `npm run db:migrate` when updating an existing checkout. Partial unique indexes enforce one active credential, pending pairing ticket, and queued/running scan per device. Existing imported scans are preserved.
+
+The private control API provides GET `/api/v1/control/status` and POST `/api/v1/control/pairing`, `/scan`, and `/revoke`, restricted to backend `DEVICE_KEY` and the existing server-only control token. Next.js proxies require local same-origin POST requests. Settings displays a cryptographically random, single-use pairing code that expires after five minutes. Only SHA-256 hashes of pairing codes, device tokens, and job leases are stored. No raw agent credential is returned to the browser.
+
+The loopback agent API provides POST `/api/v1/agent/pair`, `/heartbeat`, `/claim`, and `/result`. Pairing exchanges the code for a device-scoped credential. Result uploads validate the current credential, device ownership, claimed job, lease, state, expiry, and snapshot schema. Snapshot persistence and job completion share a transaction. Identical repeated result uploads are idempotent; altered results, expired jobs, revoked credentials, and mismatched leases are rejected. Claims use conditional updates, and scan requests serialize duplicate queue attempts. Only `scan` operations are issued—no arbitrary command, path, installer URL, or shell arguments are accepted.
+
+Running/queued jobs expire after ten minutes, lazily reconciled by status and agent requests. No automatic scan retries occur. A successful upload of a partial snapshot completes the transport job; WinGet errors and warnings remain visible in the imported inventory/history. Pending uploads are encrypted on the agent and retried on reconnect. This is not a public remote management service or multi-user authorization implementation.
+
+`node --import tsx scripts/smoke-agent.mjs` checks pairing replay, job deduplication, leases, idempotent results, expiry, revocation, DPAPI credential storage, the real C# scanner/upload path, and frontend origin rejection using a temporary device. It needs a built .NET agent, local database access, and the WinGet module. Temporary rows and state files are removed after the test. Application updates are not executed.
+
 ## Imported scan history
 
 `GET /api/v1/history` provides device-scoped scan history only. Parameters: `q` (device name or exact full scan UUID), `status` (`all`, `completed`, `failed`, `not-requested`), `direction` (`asc`/`desc` by scan time), `page`, `pageSize` (max 100), and optional exact scan `id`. Unknown/duplicate parameters are rejected. Scan ID lookups still require the configured device key. Totals, paging, and counts run in one repeatable-read transaction. Lists expose warning counts; exact ID lookups additionally return recorded warnings. Raw snapshot payloads, registry paths, and credentials are not returned.
@@ -24,7 +36,7 @@ The overview handles loading, unavailable backend/database, missing scans, faile
 
 Verify the overview against `npm run db:summary -- --device-key local-pc`. A different device key requires changing backend `DEVICE_KEY`, not passing arbitrary device identifiers from a browser.
 
-This milestone stores the agent's JSON snapshot in a local PostgreSQL database using TypeScript and Prisma ORM 7. It has a local command-line importer, not an HTTP server. The browser and agent do not receive database credentials. Automatic uploads, pairing, and frontend APIs are later milestones.
+This milestone stores the agent's JSON snapshot in a local PostgreSQL database using TypeScript and Prisma ORM 7. It includes a local command-line importer and a loopback authenticated HTTP API. The browser and agent do not receive database credentials. Paired agents can upload scan-job results; update execution remains disabled.
 
 ## 1. Create a dedicated local database
 

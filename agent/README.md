@@ -1,5 +1,27 @@
 # UpdatePilot Windows agent — read-only inventory
 
+## Pair and listen for real scan jobs
+
+Start the local backend and frontend. Open Settings in the dashboard and generate a pairing code. In **Command Prompt**, from the `agent` directory, run:
+
+```cmd
+"C:\Program Files\dotnet\dotnet.exe" run --project .\UpdatePilot.Agent -- --pair
+```
+
+Enter the short-lived code at the prompt (not on the command line). Then run:
+
+```cmd
+"C:\Program Files\dotnet\dotnet.exe" run --project .\UpdatePilot.Agent -- --listen
+```
+
+In PowerShell, put `&` before the quoted executable path. Keep the listening terminal open and click **Scan Now** on Overview or Settings. The agent executes only the fixed registry/WinGet scanner, uploads its snapshot, and the backend imports it atomically. No manual JSON import is needed for these jobs. A completed job means a snapshot was saved; a partial WinGet scan remains labelled as such inside that snapshot.
+
+Credentials and pending upload envelopes are encrypted with Windows DPAPI for the current user in `%LOCALAPPDATA%\UpdatePilot`. Do not share that directory. Only one listener can use a state directory at once. Stop with Ctrl+C; a running scan is stopped, and an unfinished job eventually becomes interrupted. The agent runs in your user session, not as a Windows service, and requires no elevation for scanning.
+
+For nondefault local ports, set `UPDATEPILOT_API_URL` before pairing/listening. Only HTTP loopback (`localhost` or `127.0.0.1`) is supported. Heartbeats are sent approximately every 10 seconds; the UI treats a heartbeat older than 45 seconds as offline. Server restarts preserve queued/running jobs. Jobs expire after ten minutes; they are never automatically rerun. Pending results are retried after reconnect and deduplicated by job, lease, and result hash. Revoked or expired results are rejected. Generating a new pairing code invalidates older unused codes; successfully pairing replaces prior credentials. Use **Revoke Agent** to revoke credentials and interrupt pending jobs.
+
+This is a local single-user development flow. The existing server-only dashboard token is the local control authority; internet hosting, multi-user authentication, unattended installation, and agent self-update are not enabled.
+
 Prerequisite: .NET 10 SDK on Windows. Run from this directory in a normal, non-administrator PowerShell:
 
 ```powershell

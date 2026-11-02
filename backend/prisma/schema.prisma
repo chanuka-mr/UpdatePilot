@@ -13,6 +13,48 @@ model Device {
   name      String
   createdAt DateTime            @default(now()) @db.Timestamptz(3)
   scans     InventorySnapshot[]
+  agents    AgentCredential[]
+  pairings  PairingTicket[]
+  scanJobs  ScanJob[]
+}
+
+model AgentCredential {
+  id          String   @id @default(uuid()) @db.Uuid
+  deviceId    String   @db.Uuid
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  lastSeenAt  DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  jobs        ScanJob[]
+}
+
+model PairingTicket {
+  id         String    @id @default(uuid()) @db.Uuid
+  deviceId   String    @db.Uuid
+  device     Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  codeHash   String    @unique
+  expiresAt  DateTime  @db.Timestamptz(3)
+  usedAt     DateTime? @db.Timestamptz(3)
+}
+
+model ScanJob {
+  id           String           @id @default(uuid()) @db.Uuid
+  deviceId     String           @db.Uuid
+  device       Device           @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  agentId      String?          @db.Uuid
+  agent        AgentCredential? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  state        String
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  expiresAt    DateTime         @db.Timestamptz(3)
+  startedAt    DateTime?        @db.Timestamptz(3)
+  finishedAt   DateTime?        @db.Timestamptz(3)
+  leaseHash    String?
+  snapshotId   String?          @db.Uuid
+  resultHash   String?
+  error        String?
+
+  @@index([deviceId, createdAt(sort: Desc)])
 }
 
 model InventorySnapshot {

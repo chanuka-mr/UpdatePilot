@@ -4,6 +4,7 @@ import { createDatabase } from "./database.js";
 import { summarizePackages } from "./dashboard.js";
 import { readCatalog } from "./catalog.js";
 import { readHistory } from "./history.js";
+import { agentRequest, control, ApiError } from './agent-api.js';
 
 const db = createDatabase();
 const token = process.env.BACKEND_API_TOKEN;
@@ -16,13 +17,23 @@ const server = createServer(async (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Content-Type-Options", "nosniff");
   const send = (status: number, body: unknown) => { res.writeHead(status); res.end(JSON.stringify(body)); };
+  const url = new URL(req.url || '/', 'http://127.0.0.1');
+  if(url.pathname.startsWith('/api/v1/agent/')) {
+    try {send(200,await agentRequest(db,req,url.pathname.slice('/api/v1/agent/'.length)));}
+    catch(error){send(error instanceof ApiError?error.status:error instanceof Error&&error.name==='ZodError'?400:503,{error:error instanceof ApiError?error.message:'Agent request could not be processed.'});}
+    return;
+  }
   // Local single-device development API. The Next.js server keeps this token private.
   // No CORS access or agent execution endpoints are exposed.
   const supplied = Buffer.from(req.headers.authorization || "");
   const expected = Buffer.from(`Bearer ${token}`);
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { send(401, { error: "Unauthorized" }); return; }
+  if(url.pathname.startsWith('/api/v1/control/')) {
+    try{send(200,await control(db,deviceKey,url.pathname.slice('/api/v1/control/'.length),req.method||''));}
+    catch(error){send(error instanceof ApiError?error.status:503,{error:error instanceof ApiError?error.message:'Control request failed. Retry after checking the database migration.'});}
+    return;
+  }
   if (req.method !== "GET") { res.setHeader("Allow", "GET"); send(405, { error: "Read-only API" }); return; }
-  const url = new URL(req.url || '/', 'http://127.0.0.1');
   if (!['/api/v1/dashboard', '/api/v1/applications', '/api/v1/updates', '/api/v1/history'].includes(url.pathname)) { send(404, { error: "Not found" }); return; }
   if (url.pathname !== '/api/v1/dashboard') {
     try { send(200, url.pathname === '/api/v1/history' ? await readHistory(db, deviceKey, url.searchParams) : await readCatalog(db, deviceKey, url.searchParams, url.pathname === '/api/v1/updates')); }

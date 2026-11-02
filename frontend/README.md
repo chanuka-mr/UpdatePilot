@@ -1,5 +1,11 @@
 # UpdatePilot frontend
 
+## Real Scan Now and agent settings
+
+Settings now provides pairing, revocation, heartbeat status, and scan-job controls. Generate a pairing code, run the agent with `--pair` and then `--listen` as described in `../agent/README.md`, and keep its terminal open. Overview includes the same real Scan Now control. Pairing codes expire after five minutes. Status polls every five seconds; a scan initiated in that page refreshes it when the job completes. Reloading the page still shows the latest persisted job, but may require Refresh stored data after completion. The UI never receives the device credential or database password.
+
+Scan Now requires a recent agent heartbeat and queues only a read-only scan. It does not install applications. Revoke Agent invalidates the credential and interrupts queued/running jobs. Refresh stored data continues to reload PostgreSQL without starting a scan. This local control flow requires the additive agent-job migrations and a running backend.
+
 ## Connected scan history
 
 `/history` now uses PostgreSQL through `/api/history`. Search accepts a device name or full scan UUID; filters target WinGet state. Ten-row pages can be ordered by scan time. Details show the real scan/import times, separate inventory counts, unknown catalog counts for incomplete scans, and recorded warnings. Export this page downloads only the currently visible filtered page; Export scan details includes one record and its diagnostics. Exports contain private local inventory metadata. No fabricated update events, hashes, or traces appear on the live history screen. No migration is required.

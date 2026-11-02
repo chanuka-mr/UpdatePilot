@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { RefreshCw, Database, Download, Grip } from 'lucide-react';
+import { AgentControls } from './agent-controls';
 import { AppIcon, Heading } from '../../components/ui/dashboard';
 
 type Dashboard = { state: 'ready'; deviceName: string; scannedAt: string; importedAt: string; stale: boolean;
@@ -22,11 +23,11 @@ export function LiveOverview() {
   }, [refresh]);
   return <><Heading title="Overview" description="Software inventory from your latest imported Windows agent scan."
     action={<button className="primary-button" disabled={loading} onClick={() => setRefresh(value => value + 1)}><RefreshCw size={17} className={loading ? 'animate-spin' : ''}/>Refresh stored data</button>}/>
-    {loading && <div role="status" className="panel p-10 text-center text-muted">Loading the latest scan from PostgreSQL…</div>}
+    <AgentControls compact/>{loading && <div role="status" className="panel p-10 text-center text-muted">Loading the latest scan from PostgreSQL…</div>}
     {error && <div role="alert" className="panel border border-red-100 p-6"><h2 className="font-semibold">Dashboard unavailable</h2><p className="mt-2 text-muted">{error}</p><button className="mt-4 text-primary underline" onClick={() => setRefresh(value => value + 1)}>Try again</button></div>}
     {!loading && data?.state === 'empty' && <section className="panel p-10 text-center"><Database className="mx-auto text-primary"/><h2 className="mt-4 text-lg font-semibold">No imported scans yet</h2><p className="mt-2 text-muted">Import an agent snapshot into the configured device, then refresh this page.</p></section>}
     {!loading && data?.state === 'ready' && <>
-      <section className="panel p-5"><h2 className="font-semibold">{data.deviceName}</h2><p className="mt-2 text-sm text-muted">Last imported scan: {new Date(data.scannedAt).toLocaleString()}</p><p className="mt-1 text-xs text-muted">Imported {new Date(data.importedAt).toLocaleString()} · Live agent connection unknown</p>
+      <section className="panel p-5"><h2 className="font-semibold">{data.deviceName}</h2><p className="mt-2 text-sm text-muted">Last imported scan: {new Date(data.scannedAt).toLocaleString()}</p><p className="mt-1 text-xs text-muted">Imported {new Date(data.importedAt).toLocaleString()} · Agent connection status is shown above</p>
         {(data.stale || data.warningCount > 0 || data.wingetStatus !== 'completed') && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{data.stale ? 'Scan is over 24 hours old. ' : ''}{data.warningCount > 0 ? `${data.warningCount} scan warning(s). ` : ''}{data.wingetStatus !== 'completed' ? 'WinGet scan was not completed; update counts are unknown.' : ''}</p>}
       </section>
       <div className="grid gap-4 sm:grid-cols-3">{[['Desktop registry entries', data.registryEntries, Grip], ['Updates available', data.updatesAvailable, Download], ['WinGet inventory entries', data.wingetEntries, Database]].map(([label,count,Icon]) => {const I=Icon as typeof Grip;return <section className="panel p-6" key={String(label)}><div className="flex justify-between gap-2"><h2 className="metric-label">{String(label)}</h2><I size={23} className="text-primary"/></div><p className="metric-number">{count === null ? 'Unknown' : String(count)}</p></section>;})}</div>
