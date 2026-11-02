@@ -1,5 +1,11 @@
 # UpdatePilot frontend
 
+## Agent-resolved update preview
+
+Real update candidates on `/updates` (and the WinGet application inventory view) now provide **Resolve update preview**. Start the updated paired agent, run a fresh scan, and select a candidate. The dialog queues a read-only agent job and polls its result. It displays live installed/catalog candidate versions, catalog publisher, source, exact-identifier scope when available, and query time. Changed/ambiguous installations and unavailable metadata are explicit states. Unknown installer architecture, signature, applicability, reboot needs, release dates, and notes remain labelled as unknown/not verified. **Installation disabled** is intentional. No real candidate links into the standalone demo installer routes.
+
+Preview jobs and scan jobs share one per-device execution slot. The dialog follows its requested latest job; if another job supersedes status, request a fresh preview after it finishes. Closing a dialog does not cancel a queued job. Results remain stored in PostgreSQL but are not scan-history or install-history events. Existing servers started with `npm start` and old agent listeners must be restarted after updating; the additive preview migration must be applied.
+
 ## Real Scan Now and agent settings
 
 Settings now provides pairing, revocation, heartbeat status, and scan-job controls. Generate a pairing code, run the agent with `--pair` and then `--listen` as described in `../agent/README.md`, and keep its terminal open. Overview includes the same real Scan Now control. Pairing codes expire after five minutes. Status polls every five seconds; a scan initiated in that page refreshes it when the job completes. Reloading the page still shows the latest persisted job, but may require Refresh stored data after completion. The UI never receives the device credential or database password.

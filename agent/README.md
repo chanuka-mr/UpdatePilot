@@ -1,5 +1,11 @@
 # UpdatePilot Windows agent — read-only inventory
 
+## Update metadata previews
+
+The listening agent also accepts the fixed `preview` job operation. It runs the bundled `Get-UpdatePreview.ps1` with a locally written JSON request, validates the package identifier before launching PowerShell, queries exact WinGet identities, and uploads a read-only metadata result. Heartbeats continue during resolution. No install, download, custom executable, or shell command operation is supported. Unknown architecture, signature/applicability, and release metadata keep installation disabled. Exact product-code matches may resolve installation scope; display names and registry views are not used to guess identity or architecture.
+
+After updating the source, stop an old listener with Ctrl+C, rebuild, and restart `--listen`. Pairing remains valid unless explicitly revoked. Preview uploads use the existing DPAPI-protected pending envelope and lease checks.
+
 ## Pair and listen for real scan jobs
 
 Start the local backend and frontend. Open Settings in the dashboard and generate a pairing code. In **Command Prompt**, from the `agent` directory, run:

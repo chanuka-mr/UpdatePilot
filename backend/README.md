@@ -1,5 +1,15 @@
 # UpdatePilot PostgreSQL backend
 
+## Read-only update previews
+
+`POST /api/v1/control/preview` takes only `{ "recordId": "<WinGet row UUID>" }`. The record must belong to the configured device's latest scan, be source-matched, report an update, and have a known installed version. Scans older than 24 hours are rejected. A recent paired-agent heartbeat is required. A preview shares the existing device job lease and concurrency lock with scans, and uses `operation: preview`. The migration adds nullable request/result JSON and a default scan operation to the existing job table.
+
+The updated agent independently queries `Get-WinGetPackage` and `Find-WinGetPackage` using exact package IDs and the fixed winget source. It verifies the installed version has not changed, obtains the catalog's candidate version and publisher, and uses exact catalog product identifiers to locate uninstall registry scope. Ambiguous/missing identities block the result. Scope remains unknown when exact product identifiers do not resolve a single scope. Registry view is never treated as architecture.
+
+The installed Microsoft.WinGet.Client metadata wrapper does not expose every installer decision. Architecture, signature verification, applicability, reboot needs, release date, and release notes are therefore not asserted. Catalog versions are candidates, not approved installation targets; results are `incomplete`, `blocked`, or `no-update`, never installation-ready. No installer is downloaded or executed. Preview schemas require `installationEnabled: false` and `signatureVerified: false` (meaning not verified). The browser cannot supply target versions, arbitrary commands, installer URLs, or execution arguments.
+
+Results are persisted on the leased job, fingerprinted for duplicate upload handling, and available through the existing local control status route. A preview completion does not create an inventory snapshot or update-history entry. Run a fresh scan after metadata says the installed version changed. Restart an already-running agent after updating so it recognizes preview jobs. Existing pairing credentials can be retained.
+
 ## Agent pairing and scan jobs
 
 Additive migrations introduce `AgentCredential`, `PairingTicket`, and `ScanJob`. Run `npm run db:generate` and `npm run db:migrate` when updating an existing checkout. Partial unique indexes enforce one active credential, pending pairing ticket, and queued/running scan per device. Existing imported scans are preserved.

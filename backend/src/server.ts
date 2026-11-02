@@ -4,7 +4,7 @@ import { createDatabase } from "./database.js";
 import { summarizePackages } from "./dashboard.js";
 import { readCatalog } from "./catalog.js";
 import { readHistory } from "./history.js";
-import { agentRequest, control, ApiError } from './agent-api.js';
+import { agentRequest, control, ApiError, body } from './agent-api.js';
 
 const db = createDatabase();
 const token = process.env.BACKEND_API_TOKEN;
@@ -29,7 +29,7 @@ const server = createServer(async (req, res) => {
   const expected = Buffer.from(`Bearer ${token}`);
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { send(401, { error: "Unauthorized" }); return; }
   if(url.pathname.startsWith('/api/v1/control/')) {
-    try{send(200,await control(db,deviceKey,url.pathname.slice('/api/v1/control/'.length),req.method||''));}
+    try{send(200,await control(db,deviceKey,url.pathname.slice('/api/v1/control/'.length),req.method||'',url.pathname==='/api/v1/control/preview'?await body(req):undefined));}
     catch(error){send(error instanceof ApiError?error.status:503,{error:error instanceof ApiError?error.message:'Control request failed. Retry after checking the database migration.'});}
     return;
   }

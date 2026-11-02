@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <None Update="Scripts\Get-WinGetInventory.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Scripts\Get-UpdatePreview.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

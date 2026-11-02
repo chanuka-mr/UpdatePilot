@@ -41,7 +41,7 @@ internal static class AgentConnection
             using var instanceLock = new FileStream(Path.Combine(state, "listener.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             var credential = Encoding.UTF8.GetString(UserProtection.Transform(await File.ReadAllBytesAsync(credentialPath, cancel.Token), true));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential);
-            Console.WriteLine("Agent listening for scan-only jobs. Keep this terminal open. Ctrl+C stops it.");
+            Console.WriteLine("Agent listening for scan and read-only metadata-preview jobs. Keep this terminal open. Ctrl+C stops it.");
             while (!cancel.IsCancellationRequested)
             {
                 try
@@ -51,11 +51,13 @@ internal static class AgentConnection
                     var claim = await Post(client, "claim", new { }, cancel.Token);
                     if (claim.TryGetProperty("job", out var job) && job.ValueKind != JsonValueKind.Null)
                     {
-                        if (job.GetProperty("operation").GetString() != "scan") throw new InvalidOperationException("Unsupported job operation.");
+                        var operation = job.GetProperty("operation").GetString();
+                        if (operation is not ("scan" or "preview")) throw new InvalidOperationException("Unsupported job operation.");
                         var id = job.GetProperty("id").GetString()!;
                         if (!Guid.TryParse(id, out _)) throw new InvalidOperationException("Invalid job ID.");
                         var lease = job.GetProperty("lease").GetString()!;
-                        await ScanAndUpload(client, state, id, lease, cancel.Token);
+                        if(operation=="preview")await PreviewAndUpload(client,state,id,lease,job.GetProperty("request"),cancel.Token);
+                        else await ScanAndUpload(client, state, id, lease, cancel.Token);
                     }
                 }
                 catch (UnauthorizedAccessException) { Console.Error.WriteLine("Agent credential revoked or unknown. Pair again in Settings."); return 1; }
@@ -122,6 +124,17 @@ internal static class AgentConnection
         var accepted = await UploadPending(client, state, cancellationToken);
         if (File.Exists(file)) File.Delete(file);
         Console.WriteLine(accepted ? "Scan result accepted by the backend. Refresh the dashboard to see it." : "Scan result was rejected. Check the job state; no scan will be automatically repeated.");
+    }
+    private static async Task PreviewAndUpload(HttpClient client,string state,string id,string lease,JsonElement request,CancellationToken cancellationToken)
+    {
+        var directory=Path.Combine(state,"jobs",id);Directory.CreateDirectory(directory);
+        string envelope;
+        try{var preview=await PreviewRunner.ResolveAsync(request,directory,async()=>{await Post(client,"heartbeat",new{},cancellationToken);},cancellationToken);envelope=JsonSerializer.Serialize(new{jobId=id,lease,preview});}
+        catch(Exception ex) when(ex is InvalidOperationException or JsonException or TaskCanceledException or IOException)
+        {cancellationToken.ThrowIfCancellationRequested();envelope=JsonSerializer.Serialize(new{jobId=id,lease,error="preview_failed"});}
+        var pending=Path.Combine(state,"pending.bin");
+        await File.WriteAllBytesAsync(pending+".tmp",UserProtection.Transform(Encoding.UTF8.GetBytes(envelope),false),cancellationToken);File.Move(pending+".tmp",pending,overwrite:true);
+        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Read-only preview result uploaded. Installation remains disabled.":"Preview result rejected. No installation was attempted.");
     }
     private static async Task<bool> UploadPending(HttpClient client, string state, CancellationToken cancellationToken)
     {

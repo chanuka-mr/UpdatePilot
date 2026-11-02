@@ -4,6 +4,7 @@ import type { IncomingMessage } from 'node:http';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import { contentHash, snapshotSchema } from './inventory.js';
 import { saveSnapshot } from './save-snapshot.js';
+import { previewRequestSchema, previewResultSchema } from './preview.js';
 export const hashSecret = (value:string) => createHash('sha256').update(value).digest('hex');
 export const isOnline = (last:Date|null, revoked:Date|null, now=Date.now()) => !revoked && !!last && now-last.getTime()<45000;
 export class ApiError extends Error { constructor(public status:number,message:string){super(message);} }
@@ -16,13 +17,13 @@ export async function body(req:IncomingMessage) {
 async function expire(db:PrismaClient,deviceId:string) {
   await db.scanJob.updateMany({where:{deviceId,state:{in:['queued','running']},expiresAt:{lt:new Date()}},data:{state:'interrupted',finishedAt:new Date(),error:'Job expired. No automatic retry was performed.'}});
 }
-export async function control(db:PrismaClient,key:string,action:string,method:string) {
+export async function control(db:PrismaClient,key:string,action:string,method:string,payload?:unknown) {
   const device=await db.device.findUnique({where:{key}});
   if(!device)throw new ApiError(409,'Import a scan for this device before pairing.');
   await expire(db,device.id);
   if(action==='status'&&method==='GET') {
     const agent=await db.agentCredential.findFirst({where:{deviceId:device.id,revokedAt:null},orderBy:{createdAt:'desc'}});
-    const job=await db.scanJob.findFirst({where:{deviceId:device.id},orderBy:{createdAt:'desc'},select:{id:true,state:true,createdAt:true,startedAt:true,finishedAt:true,error:true,snapshotId:true}});
+    const job=await db.scanJob.findFirst({where:{deviceId:device.id},orderBy:{createdAt:'desc'},select:{id:true,state:true,operation:true,request:true,preview:true,createdAt:true,startedAt:true,finishedAt:true,error:true,snapshotId:true}});
     return {paired:!!agent,online:agent?isOnline(agent.lastSeenAt,agent.revokedAt):false,lastSeenAt:agent?.lastSeenAt??null,job};
   }
   if(action==='pairing'&&method==='POST') {
@@ -44,6 +45,22 @@ export async function control(db:PrismaClient,key:string,action:string,method:st
       const active=await tx.scanJob.findFirst({where:{deviceId:device.id,state:{in:['queued','running']}}});
       if(active)return {jobId:active.id,state:active.state};
       const job=await tx.scanJob.create({data:{deviceId:device.id,state:'queued',expiresAt:new Date(Date.now()+10*60000)}});
+      return {jobId:job.id,state:job.state};
+    },{isolationLevel:'Serializable'});
+  }
+  if(action==='preview'&&method==='POST') {
+    const {recordId}=z.object({recordId:z.uuid()}).strict().parse(payload);
+    return db.$transaction(async tx=>{
+      const agent=await tx.agentCredential.findFirst({where:{deviceId:device.id,revokedAt:null}});
+      if(!agent||!isOnline(agent.lastSeenAt,agent.revokedAt))throw new ApiError(409,'Start the paired agent to resolve a fresh preview.');
+      const latest=await tx.inventorySnapshot.findFirst({where:{deviceId:device.id},orderBy:{scannedAt:'desc'}});
+      if(!latest||Date.now()-latest.scannedAt.getTime()>86400000)throw new ApiError(409,'Run a fresh scan before previewing updates.');
+      const pkg=await tx.winGetPackage.findFirst({where:{id:recordId,snapshotId:latest.id,matchStatus:'matched',isUpdateAvailable:true,source:{equals:'winget',mode:'insensitive'}}});
+      if(!pkg||!pkg.installedVersion)throw new ApiError(409,'This package is no longer an update candidate in the latest scan.');
+      const request=previewRequestSchema.parse({packageId:pkg.packageId,installedVersion:pkg.installedVersion,snapshotId:latest.id});
+      const active=await tx.scanJob.findFirst({where:{deviceId:device.id,state:{in:['queued','running']}}});
+      if(active)throw new ApiError(409,'Wait for the active scan or preview job to finish.');
+      const job=await tx.scanJob.create({data:{deviceId:device.id,operation:'preview',request,state:'queued',expiresAt:new Date(Date.now()+10*60000)}});
       return {jobId:job.id,state:job.state};
     },{isolationLevel:'Serializable'});
   }
@@ -75,20 +92,22 @@ export async function agentRequest(db:PrismaClient,req:IncomingMessage,action:st
     if(!job)return {job:null};
     const lease=randomBytes(32).toString('hex');
     const claimed=await db.scanJob.updateMany({where:{id:job.id,state:'queued',expiresAt:{gt:new Date()}},data:{state:'running',agentId:agent.id,leaseHash:hashSecret(lease),startedAt:new Date(),expiresAt:new Date(Date.now()+10*60000)}});
-    return {job:claimed.count?{id:job.id,operation:'scan',lease}:null};
+    return {job:claimed.count?{id:job.id,operation:job.operation,request:job.request,lease}:null};
   }
   if(action==='result') {
-    const result=z.object({jobId:z.uuid(),lease:z.string().regex(/^[a-f0-9]{64}$/),snapshot:snapshotSchema.optional(),error:z.enum(['scan_failed','scan_timeout']).optional()}).strict().refine(v=>!!v.snapshot!==!!v.error).parse(await body(req));
+    const result=z.object({jobId:z.uuid(),lease:z.string().regex(/^[a-f0-9]{64}$/),snapshot:snapshotSchema.optional(),preview:previewResultSchema.optional(),error:z.enum(['scan_failed','scan_timeout','preview_failed']).optional()}).strict().refine(v=>[v.snapshot,v.preview,v.error].filter(Boolean).length===1).parse(await body(req));
     return db.$transaction(async tx=>{
       const validAgent=await tx.agentCredential.findUnique({where:{id:agent.id}});
       if(!validAgent||validAgent.revokedAt)throw new ApiError(401,'Agent revoked');
       const job=await tx.scanJob.findFirst({where:{id:result.jobId,deviceId:agent.deviceId,agentId:agent.id,leaseHash:hashSecret(result.lease)}});
       if(!job)throw new ApiError(403,'Job does not belong to this agent');
-      const fingerprint=result.snapshot?contentHash(result.snapshot):result.error!;
+      if(job.operation==='scan'&&result.preview||job.operation==='preview'&&result.snapshot)throw new ApiError(400,'Result does not match job operation');
+      if(result.preview){const requested=previewRequestSchema.parse(job.request);if(result.preview.packageId!==requested.packageId)throw new ApiError(400,'Preview package identity mismatch');}
+      const fingerprint=result.snapshot?contentHash(result.snapshot):result.preview?hashSecret(JSON.stringify(result.preview)):result.error!;
       if(['completed','failed'].includes(job.state)&&job.resultHash===fingerprint)return {ok:true,snapshotId:job.snapshotId};
       if(job.state!=='running'||job.expiresAt.getTime()<Date.now())throw new ApiError(409,'Job is no longer running');
       const stored=result.snapshot?await saveSnapshot(tx,agent.deviceId,result.snapshot):null;
-      const saved=await tx.scanJob.updateMany({where:{id:job.id,state:'running'},data:{state:stored?'completed':'failed',finishedAt:new Date(),snapshotId:stored?.id,resultHash:fingerprint,error:result.error??null}});
+      const saved=await tx.scanJob.updateMany({where:{id:job.id,state:'running'},data:{state:stored||result.preview?'completed':'failed',preview:result.preview,finishedAt:new Date(),snapshotId:stored?.id,resultHash:fingerprint,error:result.error??null}});
       if(saved.count!==1)throw new ApiError(409,'Job state changed');
       return {ok:true,snapshotId:stored?.id??null};
     },{isolationLevel:'Serializable',timeout:30000});

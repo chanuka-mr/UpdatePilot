@@ -1,0 +1,1 @@
+ALTER TABLE "ScanJob" ADD COLUMN "operation" TEXT NOT NULL DEFAULT 'scan', ADD COLUMN "request" JSONB, ADD COLUMN "preview" JSONB;

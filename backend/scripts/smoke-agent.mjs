@@ -52,6 +52,16 @@ try{
   const imported=await db.inventorySnapshot.findUnique({where:{id:completion.snapshotId},include:{_count:{select:{applications:true,packages:true}}}});
   assert.ok(imported._count.applications>0);assert.equal(imported.wingetStatus,'completed');
   console.log(JSON.stringify({realScanJob:'completed',registryEntries:imported._count.applications,wingetEntries:imported._count.packages}));
+  const candidate=await db.winGetPackage.findFirst({where:{snapshotId:imported.id,isUpdateAvailable:true,matchStatus:'matched',packageId:'VideoLAN.VLC'}});
+  assert.ok(candidate,'VLC update candidate required for the real metadata-preview test');
+  const previewQueued=await ok('control/preview',{recordId:candidate.id});
+  const previewFinished=await waitFor(async()=>{const status=await ok('control/status');return status.job?.id===previewQueued.jobId&&['completed','failed','interrupted'].includes(status.job.state)?status.job:null;},160);
+  assert.equal(previewFinished.state,'completed');assert.equal(previewFinished.preview.packageId,candidate.packageId);
+  assert.ok(previewFinished.preview.targetVersion);assert.equal(previewFinished.preview.architecture,'unknown');
+  assert.equal(previewFinished.preview.installationEnabled,false);assert.equal(previewFinished.preview.signatureVerified,false);
+  assert.equal(previewFinished.preview.status,'incomplete');
+  console.log(JSON.stringify({readOnlyPreview:'completed',packageId:previewFinished.preview.packageId,targetVersion:previewFinished.preview.targetVersion,scope:previewFinished.preview.scope,installationEnabled:false}));
+  assert.equal((await request('control/preview',{recordId:randomUUID()})).status,409);
   process.env.BACKEND_API_URL=`http://127.0.0.1:${port}`;
   const {POST}=await import('../../frontend/app/api/agent/[action]/route.ts');
   const forbidden=await POST(new Request('http://localhost:3000/api/agent/scan',{method:'POST',headers:{Origin:'http://untrusted.example'}}),{params:Promise.resolve({action:'scan'})});assert.equal(forbidden.status,403);

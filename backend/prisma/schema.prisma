@@ -45,6 +45,9 @@ model ScanJob {
   agentId      String?          @db.Uuid
   agent        AgentCredential? @relation(fields: [agentId], references: [id], onDelete: SetNull)
   state        String
+  operation    String           @default("scan")
+  request      Json?
+  preview      Json?
   createdAt    DateTime         @default(now()) @db.Timestamptz(3)
   expiresAt    DateTime         @db.Timestamptz(3)
   startedAt    DateTime?        @db.Timestamptz(3)
