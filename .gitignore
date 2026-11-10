@@ -151,7 +151,7 @@ vite.config.ts.timestamp-*
 
 
 
-example/
+examples/
 
 # .NET agent build output and private local inventory
 agent/**/bin/
