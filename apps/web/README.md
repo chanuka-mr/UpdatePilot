@@ -2,7 +2,7 @@
 
 ## Agent-resolved update preview
 
-Real update candidates on `/updates` (and the WinGet application inventory view) now provide **Resolve update preview**. Start the updated paired agent, run a fresh scan, and select a candidate. The dialog queues a read-only agent job and polls its result. It displays live installed/catalog candidate versions, catalog publisher, source, exact-identifier scope when available, and query time. Changed/ambiguous installations and unavailable metadata are explicit states. Unknown installer architecture, signature, applicability, reboot needs, release dates, and notes remain labelled as unknown/not verified. **Installation disabled** is intentional. No real candidate links into the standalone demo installer routes.
+Real update candidates on `/updates` (and the WinGet application inventory view) now provide **Resolve update preview**. Start the updated paired agent, run a fresh scan, and select a candidate. The dialog queues a read-only agent job and polls its result. It displays live installed/catalog candidate versions, catalog publisher, source, exact-identifier scope when available, and query time. Changed/ambiguous installations and unavailable metadata are explicit states. Unknown installer architecture, signature, applicability, reboot needs, release dates, and notes remain labelled as unknown/not verified. **Installation disabled** is intentional. No real candidate links into the standalone demo installer routes. A resolved preview exposes **Review and confirm**, which opens `/updates/<record-id>/confirm` with the installed/target versions, installer type, SHA-256, scope, and agent warnings. Confirmation requires an explicit checkbox acknowledgement and does not download, execute, or install anything.
 
 Preview jobs and scan jobs share one per-device execution slot. The dialog follows its requested latest job; if another job supersedes status, request a fresh preview after it finishes. Closing a dialog does not cancel a queued job. Results remain stored in PostgreSQL but are not scan-history or install-history events. Existing servers started with `npm start` and old agent listeners must be restarted after updating; the additive preview migration must be applied.
 
@@ -37,6 +37,7 @@ The API secret is server-only in `.env.local`; never use a `NEXT_PUBLIC_` prefix
 - `/applications/google-chrome`: application details (other demo IDs are supported).
 - `/updates`: searchable available updates.
 - `/updates/google-chrome`: update preview and confirmation.
+- `/updates/<record-id>/confirm`: live agent-resolved confirmation. Shows installer identity metadata and warnings; acknowledgement only, no installation.
 - `/updates/google-chrome/progress`: installation and result-state previews.
 - `/history`: activity filters, event detail dialog, and sample JSON exports.
 - `/security` and `/settings`: supporting preview pages.
