@@ -18,8 +18,12 @@ async function expire(db:PrismaClient,deviceId:string) {
   await db.scanJob.updateMany({where:{deviceId,state:{in:['queued','running']},expiresAt:{lt:new Date()}},data:{state:'interrupted',finishedAt:new Date(),error:'Job expired. No automatic retry was performed.'}});
 }
 export async function control(db:PrismaClient,key:string,action:string,method:string,payload?:unknown) {
-  const device=await db.device.findUnique({where:{key}});
-  if(!device)throw new ApiError(409,'Import a scan for this device before pairing.');
+  let device=await db.device.findUnique({where:{key}});
+  // Pairing is the secure bootstrap path for a newly installed backend. A scan
+  // cannot create the first device because scans are agent-authenticated.
+  if(!device&&action==='pairing'&&method==='POST')device=await db.device.create({data:{key,name:'Local Windows PC'}});
+  if(!device&&action==='status'&&method==='GET')return {paired:false,online:false,lastSeenAt:null,job:null};
+  if(!device)throw new ApiError(409,'Generate a pairing code before requesting agent work.');
   await expire(db,device.id);
   if(action==='status'&&method==='GET') {
     const agent=await db.agentCredential.findFirst({where:{deviceId:device.id,revokedAt:null},orderBy:{createdAt:'desc'}});

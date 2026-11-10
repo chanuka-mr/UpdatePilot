@@ -5,6 +5,8 @@ export const previewResultSchema=z.object({
   checkedAt:z.iso.datetime({offset:true}),installedVersion:z.string().max(4096),
   targetVersion:z.string().min(1).max(4096).nullable(),publisher:z.string().max(4096).nullable(),
   scope:z.enum(['user','machine','unknown']),architecture:z.literal('unknown'),
+  installerType:z.string().min(1).max(128).nullable(),installerSha256:z.string().regex(/^[A-Fa-f0-9]{64}$/).nullable(),
+  selectionValidated:z.boolean(),
   status:z.enum(['incomplete','blocked','no-update']),reason:z.string().min(1).max(4096),
   signatureVerified:z.literal(false),installationEnabled:z.literal(false),
 }).strict();

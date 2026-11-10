@@ -6,7 +6,7 @@ try {
     $request=Get-Content -LiteralPath $RequestPath -Raw | ConvertFrom-Json
     if ($request.packageId -notmatch '^[A-Za-z0-9][A-Za-z0-9.+_-]{0,199}$') { throw 'Invalid package identity' }
     Import-Module Microsoft.WinGet.Client -ErrorAction Stop -WarningAction Stop
-    $result=[ordered]@{schemaVersion=1;packageId=[string]$request.packageId;source='winget';checkedAt=[DateTimeOffset]::UtcNow.ToString('o');installedVersion=[string]$request.installedVersion;targetVersion=$null;publisher=$null;scope='unknown';architecture='unknown';status='blocked';reason='Package identity could not be resolved unambiguously.';signatureVerified=$false;installationEnabled=$false}
+    $result=[ordered]@{schemaVersion=1;packageId=[string]$request.packageId;source='winget';checkedAt=[DateTimeOffset]::UtcNow.ToString('o');installedVersion=[string]$request.installedVersion;targetVersion=$null;publisher=$null;scope='unknown';architecture='unknown';installerType=$null;installerSha256=$null;selectionValidated=$false;status='blocked';reason='Package identity could not be resolved unambiguously.';signatureVerified=$false;installationEnabled=$false}
     $installed=@(Get-WinGetPackage -Id $request.packageId -Source winget -MatchOption Equals | Where-Object { $_.Id -ceq $request.packageId -and $_.Source -eq 'winget' })
     if ($installed.Count -ne 1) { ConvertTo-Json -InputObject $result -Compress; exit 0 }
     $result.installedVersion=[string]$installed[0].InstalledVersion
@@ -38,7 +38,22 @@ try {
     }
     $unique=@($scopes | Sort-Object -Unique)
     if ($unique.Count -eq 1) {$result.scope=$unique[0]}
+    # `winget show` chooses an installer for this device without downloading or
+    # executing it. Only accept a version-pinned, exact-ID result with a declared
+    # type and SHA-256. Text that cannot be parsed exactly is deliberately ignored.
+    $winget=(Get-Command winget.exe -ErrorAction Stop).Source
+    $show=& $winget show --id $request.packageId --exact --version $result.targetVersion --source winget --accept-source-agreements --disable-interactivity 2>$null | Out-String
+    if ($LASTEXITCODE -eq 0) {
+        $typeMatch=[regex]::Match($show,'(?im)^Installer Type:\s*(?<value>[^\r\n]+)\s*$')
+        $hashMatch=[regex]::Match($show,'(?im)^Installer SHA256:\s*(?<value>[A-Fa-f0-9]{64})\s*$')
+        if ($typeMatch.Success -and $hashMatch.Success) {
+            $result.installerType=$typeMatch.Groups['value'].Value.Trim()
+            $result.installerSha256=$hashMatch.Groups['value'].Value.ToLowerInvariant()
+            $result.selectionValidated=$true
+        }
+    }
     $result.status='incomplete'
-    $result.reason='Catalog candidate resolved. Installer applicability, architecture, signature, reboot requirements, and release metadata are not verified. Installation remains disabled.'
+    if ($result.selectionValidated) {$result.reason='WinGet selected a version-pinned installer for this device and declared its type and SHA-256. Architecture, installed-to-selected scope compatibility, signature verification, reboot requirements, and release metadata are not verified. Installation remains disabled.'}
+    else {$result.reason='Catalog candidate resolved, but an exact WinGet installer selection with a declared type and SHA-256 could not be confirmed. Installation remains disabled.'}
     ConvertTo-Json -InputObject $result -Depth 4 -Compress
 } catch {[Console]::Error.WriteLine('Read-only WinGet preview failed. Check source availability and module compatibility.');exit 1}
