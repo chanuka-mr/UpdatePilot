@@ -1,0 +1,76 @@
+import 'dotenv/config';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { mkdir, rm, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createDatabase } from '../src/database.ts';
+const db=createDatabase();const port=14021;const key=`agent-test-${randomUUID()}`;
+const root=fileURLToPath(new URL('../../',import.meta.url));
+const allowed=path.resolve(root,'windows-agent','data');const state=path.resolve(allowed,key);
+if(!state.startsWith(allowed+path.sep))throw new Error('Test state must remain inside apps/windows-agent/data');
+const device=await db.device.create({data:{key,name:'Temporary agent test'}});
+const child=spawn(process.execPath,['--import','tsx','src/server.ts'],{env:{...process.env,PORT:String(port),DEVICE_KEY:key},stdio:'ignore'});
+let listener;
+const controlToken=process.env.BACKEND_API_TOKEN;
+async function request(route,payload,token=controlToken){return fetch(`http://127.0.0.1:${port}/api/v1/${route}`,{method:payload===undefined?'GET':'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},...(payload===undefined?{}:{body:JSON.stringify(payload)}),signal:AbortSignal.timeout(45000)});}
+async function ok(route,payload,token){const res=await request(route,payload,token);assert.equal(res.status,200,route);return res.json();}
+async function waitFor(check,seconds=15){for(let i=0;i<seconds;i++){try{const value=await check();if(value)return value;}catch{}await new Promise(resolve=>setTimeout(resolve,1000));}throw new Error('Timed out waiting for test state');}
+try{
+  await waitFor(async()=>{const res=await request('control/status');return res.status===200;});
+  assert.equal((await request('agent/claim',{},'invalid')).status,401);
+  const ticket=await ok('control/pairing',{});
+  const paired=await ok('agent/pair',{code:ticket.code},'');
+  assert.equal((await request('agent/pair',{code:ticket.code},'')).status,401);
+  await ok('agent/heartbeat',{},paired.token);
+  const queued=await ok('control/scan',{});const duplicate=await ok('control/scan',{});assert.equal(queued.jobId,duplicate.jobId);
+  const claim=await ok('agent/claim',{},paired.token);assert.equal(claim.job.id,queued.jobId);
+  assert.equal((await ok('agent/claim',{},paired.token)).job,null);
+  const snapshot={schemaVersion:2,scannedAt:new Date().toISOString(),applications:[],warnings:[],winget:{status:'not-requested',inventory:null,error:null}};
+  const envelope={jobId:claim.job.id,lease:claim.job.lease,snapshot};
+  assert.equal((await request('agent/result',{...envelope,lease:'0'.repeat(64)},paired.token)).status,403);
+  const saved=await ok('agent/result',envelope,paired.token);const repeated=await ok('agent/result',envelope,paired.token);assert.equal(saved.snapshotId,repeated.snapshotId);
+  assert.equal(await db.inventorySnapshot.count({where:{deviceId:device.id}}),1);
+  assert.equal((await request('agent/result',{...envelope,snapshot:{...snapshot,scannedAt:new Date(Date.now()+1000).toISOString()}},paired.token)).status,409);
+  await ok('control/scan',{});const expiring=await ok('agent/claim',{},paired.token);
+  await db.scanJob.update({where:{id:expiring.job.id},data:{expiresAt:new Date(Date.now()-1000)}});
+  assert.equal((await request('agent/result',{jobId:expiring.job.id,lease:expiring.job.lease,snapshot},paired.token)).status,409);
+  await ok('control/revoke',{});assert.equal((await request('agent/heartbeat',{},paired.token)).status,401);
+  const nextTicket=await ok('control/pairing',{});
+  await mkdir(state,{recursive:true});
+  const dotnet='C:/Program Files/dotnet/dotnet.exe';const dll=path.join(root,'windows-agent/UpdatePilot.Agent/bin/Debug/net10.0-windows/UpdatePilot.Agent.dll');
+  const env={...process.env,UPDATEPILOT_API_URL:`http://127.0.0.1:${port}`,UPDATEPILOT_STATE_DIR:state};
+  const pairProcess=spawn(dotnet,[dll,'--pair'],{env,stdio:['pipe','ignore','ignore']});pairProcess.stdin.end(nextTicket.code+'\n');
+  await new Promise((resolve,reject)=>{pairProcess.on('error',reject);pairProcess.on('exit',code=>code===0?resolve():reject(new Error('C# pairing failed')));});
+  const protectedBytes=await readFile(path.join(state,'credential.bin'));assert.ok(protectedBytes.length>0);assert.equal(protectedBytes.includes(Buffer.from(nextTicket.code)),false);
+  listener=spawn(dotnet,[dll,'--listen'],{env,stdio:'ignore'});
+  await waitFor(async()=>{const status=await ok('control/status');return status.online;});
+  const actual=await ok('control/scan',{});
+  console.log('Pairing, replay rejection, lease ownership, duplicate result, expiry, revocation, and DPAPI pairing checks passed. Running real C# scan job...');
+  const completion=await waitFor(async()=>{const status=await ok('control/status');if(status.job?.id===actual.jobId&&status.job.state==='failed')throw new Error('C# scan failed');return status.job?.id===actual.jobId&&status.job.state==='completed'?status.job:null;},200);
+  const imported=await db.inventorySnapshot.findUnique({where:{id:completion.snapshotId},include:{_count:{select:{applications:true,packages:true}}}});
+  assert.ok(imported._count.applications>0);assert.equal(imported.wingetStatus,'completed');
+  console.log(JSON.stringify({realScanJob:'completed',registryEntries:imported._count.applications,wingetEntries:imported._count.packages}));
+  const candidate=await db.winGetPackage.findFirst({where:{snapshotId:imported.id,isUpdateAvailable:true,matchStatus:'matched',packageId:'VideoLAN.VLC'}});
+  assert.ok(candidate,'VLC update candidate required for the real metadata-preview test');
+  const previewQueued=await ok('control/preview',{recordId:candidate.id});
+  const previewFinished=await waitFor(async()=>{const status=await ok('control/status');return status.job?.id===previewQueued.jobId&&['completed','failed','interrupted'].includes(status.job.state)?status.job:null;},160);
+  assert.equal(previewFinished.state,'completed');assert.equal(previewFinished.preview.packageId,candidate.packageId);
+  assert.ok(previewFinished.preview.targetVersion);assert.equal(previewFinished.preview.architecture,'unknown');
+  assert.equal(previewFinished.preview.installationEnabled,false);assert.equal(previewFinished.preview.signatureVerified,false);
+  assert.equal(previewFinished.preview.status,'incomplete');
+  console.log(JSON.stringify({readOnlyPreview:'completed',packageId:previewFinished.preview.packageId,targetVersion:previewFinished.preview.targetVersion,scope:previewFinished.preview.scope,installationEnabled:false}));
+  assert.equal((await request('control/preview',{recordId:randomUUID()})).status,409);
+  process.env.BACKEND_API_URL=`http://127.0.0.1:${port}`;
+  const {POST}=await import('../../web/app/api/agent/[action]/route.ts');
+  const forbidden=await POST(new Request('http://localhost:3000/api/agent/scan',{method:'POST',headers:{Origin:'http://untrusted.example'}}),{params:Promise.resolve({action:'scan'})});assert.equal(forbidden.status,403);
+  const loopback=await POST(new Request('http://localhost:3000/api/agent/pairing',{method:'POST',headers:{Host:'127.0.0.1:3000',Origin:'http://127.0.0.1:3000'}}),{params:Promise.resolve({action:'pairing'})});assert.equal(loopback.status,200);
+  const forged=await POST(new Request('http://localhost:3000/api/agent/pairing',{method:'POST',headers:{Host:'attacker.example:3000',Origin:'http://attacker.example:3000'}}),{params:Promise.resolve({action:'pairing'})});assert.equal(forged.status,403);
+  console.log('Frontend control origin check passed. Temporary test device and data will be removed.');
+}finally{
+  listener?.kill();child.kill();await new Promise(resolve=>setTimeout(resolve,1000));
+  await db.device.delete({where:{id:device.id}});await db.$disconnect();
+  if(!state.startsWith(allowed+path.sep))throw new Error('Unsafe cleanup path');
+  await rm(state,{recursive:true,force:true});
+}
