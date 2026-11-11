@@ -73,7 +73,7 @@ $inventory.winget.inventory.packages |
     Format-Table -AutoSize
 ```
 
-Run dependency-free JSON contract checks:
+Run dependency-free JSON contract checks and the local installer-selection parser check:
 
 ```powershell
 dotnet run --project .\UpdatePilot.Agent.Tests

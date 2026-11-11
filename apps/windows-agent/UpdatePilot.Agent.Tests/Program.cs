@@ -1,7 +1,8 @@
+using System.Diagnostics;
 using System.Text.Json;
 using UpdatePilot.Agent;
 
-// Dependency-free contract checks; no registry access, processes, or updates.
+// Dependency-free contract checks plus a local PowerShell parser check; no registry access, network calls, or updates.
 const string sample = """
 {"schemaVersion":1,"scannedAt":"2026-10-29T10:00:00Z","moduleVersion":"1.0.0","packages":[
   {"name":"Docker Desktop","id":"Docker.DockerDesktop","installedVersion":"4.69.0","source":"winget","isUpdateAvailable":true,"availableVersions":["4.97.0","4.96.3"]},
@@ -95,7 +96,8 @@ var tests = new (string Name, Action Run)[]
         var trimmed = updateSample.TrimEnd();
         Require(!ValidUpdate(trimmed[..^1] + ",\"command\":\"winget upgrade\"}"));
         Require(!ValidUpdate(trimmed[..^1] + ",\"installerUrl\":\"https://example.com/file.exe\"}"));
-    })
+    }),
+    ("Preview installer selection parser accepts indented winget show fields", RunPreviewSelectionTest)
 };
 var failures = 0;
 foreach (var test in tests)
@@ -122,6 +124,27 @@ static bool ValidVerification(string result, string request)
         return true;
     }
     catch (Exception) { return false; }
+}
+static void RunPreviewSelectionTest()
+{
+    var script=FindTestScript("PreviewSelection.Tests.ps1");
+    var start=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"WindowsPowerShell","v1.0","powershell.exe"))
+    {UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
+    foreach(var argument in new[]{"-NoLogo","-NoProfile","-NonInteractive","-File",script})start.ArgumentList.Add(argument);
+    using var process=Process.Start(start)!;
+    var output=process.StandardOutput.ReadToEnd();
+    var error=process.StandardError.ReadToEnd();
+    process.WaitForExit();
+    if(process.ExitCode!=0)throw new Exception(error.Trim());
+}
+static string FindTestScript(string name)
+{
+    for(var directory=new DirectoryInfo(AppContext.BaseDirectory);directory!=null;directory=directory.Parent)
+    {
+        var candidate=Path.Combine(directory.FullName,"UpdatePilot.Agent.Tests",name);
+        if(File.Exists(candidate))return candidate;
+    }
+    throw new Exception("Test script not found.");
 }
 static void Reject(string json)
 {

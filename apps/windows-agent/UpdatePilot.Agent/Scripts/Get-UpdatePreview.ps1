@@ -1,4 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$RequestPath)
+. (Join-Path $PSScriptRoot 'Get-WinGetInstallerSelection.ps1')
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 [Console]::OutputEncoding=New-Object System.Text.UTF8Encoding($false)
@@ -44,11 +45,10 @@ try {
     $winget=(Get-Command winget.exe -ErrorAction Stop).Source
     $show=& $winget show --id $request.packageId --exact --version $result.targetVersion --source winget --accept-source-agreements --disable-interactivity 2>$null | Out-String
     if ($LASTEXITCODE -eq 0) {
-        $typeMatch=[regex]::Match($show,'(?im)^Installer Type:\s*(?<value>[^\r\n]+)\s*$')
-        $hashMatch=[regex]::Match($show,'(?im)^Installer SHA256:\s*(?<value>[A-Fa-f0-9]{64})\s*$')
-        if ($typeMatch.Success -and $hashMatch.Success) {
-            $result.installerType=$typeMatch.Groups['value'].Value.Trim()
-            $result.installerSha256=$hashMatch.Groups['value'].Value.ToLowerInvariant()
+        $selection=Get-WinGetInstallerSelection -Show $show
+        if ($null -ne $selection) {
+            $result.installerType=$selection.InstallerType
+            $result.installerSha256=$selection.InstallerSha256
             $result.selectionValidated=$true
         }
     }
