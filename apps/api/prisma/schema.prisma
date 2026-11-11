@@ -48,6 +48,7 @@ model ScanJob {
   operation    String           @default("scan")
   request      Json?
   preview      Json?
+  verification Json?
   createdAt    DateTime         @default(now()) @db.Timestamptz(3)
   expiresAt    DateTime         @db.Timestamptz(3)
   startedAt    DateTime?        @db.Timestamptz(3)

@@ -6,6 +6,14 @@ The listening agent also accepts the fixed `preview` job operation. It runs the 
 
 After updating the source, stop an old listener with Ctrl+C, rebuild, and restart `--listen`. Pairing remains valid unless explicitly revoked. Preview uploads use the existing DPAPI-protected pending envelope and lease checks.
 
+## Installer verification
+
+The agent also accepts the fixed `verify` job operation. It runs `Get-InstallerVerification.ps1`, which downloads the exact version-pinned installer selected by the preview into a temporary job folder using `winget download`. The download must produce exactly one file whose SHA-256 matches the preview hash. The script then checks the Authenticode signature, inspects the PE header for `.exe` files or the MSI summary template for `.msi` files, and compares the architecture with the current OS. It deletes the temporary download in a `finally` block and never launches the installer.
+
+The verification result records architecture compatibility, signature status, signer subject and thumbprint, timestamp presence, and publisher-match evidence. The backend re-binds the result to the preview and recomputes publisher matching. A non-valid signature or incompatible/unknown architecture keeps the update safety gate blocked. `UPDATE_EXECUTION_ENABLED` remains `false`, so no update job can run even after successful verification.
+
+The verification job uses a longer lease than scan/preview jobs because installer downloads can take several minutes. Keep the listener open; heartbeats continue during the download.
+
 ## Pair and listen for real scan jobs
 
 Start the local backend and frontend. Open Settings in the dashboard and generate a pairing code. In **Command Prompt**, from the `agent` directory, run:
@@ -24,7 +32,7 @@ In PowerShell, put `&` before the quoted executable path. Keep the listening ter
 
 Credentials and pending upload envelopes are encrypted with Windows DPAPI for the current user in `%LOCALAPPDATA%\UpdatePilot`. Do not share that directory. Only one listener can use a state directory at once. Stop with Ctrl+C; a running scan is stopped, and an unfinished job eventually becomes interrupted. The agent runs in your user session, not as a Windows service, and requires no elevation for scanning.
 
-For nondefault local ports, set `UPDATEPILOT_API_URL` before pairing/listening. Only HTTP loopback (`localhost` or `127.0.0.1`) is supported. Heartbeats are sent approximately every 10 seconds; the UI treats a heartbeat older than 45 seconds as offline. Server restarts preserve queued/running jobs. Jobs expire after ten minutes; they are never automatically rerun. Pending results are retried after reconnect and deduplicated by job, lease, and result hash. Revoked or expired results are rejected. Generating a new pairing code invalidates older unused codes; successfully pairing replaces prior credentials. Use **Revoke Agent** to revoke credentials and interrupt pending jobs.
+For nondefault local ports, set `UPDATEPILOT_API_URL` before pairing/listening. Only HTTP loopback (`localhost` or `127.0.0.1`) is supported. Heartbeats are sent approximately every 10 seconds; the UI treats a heartbeat older than 45 seconds as offline. Server restarts preserve queued/running jobs. Scan and preview jobs expire after ten minutes; verification jobs allow a longer download window. Jobs are never automatically rerun. Pending results are retried after reconnect and deduplicated by job, lease, and result hash. Revoked or expired results are rejected. Generating a new pairing code invalidates older unused codes; successfully pairing replaces prior credentials. Use **Revoke Agent** to revoke credentials and interrupt pending jobs.
 
 This is a local single-user development flow. The existing server-only dashboard token is the local control authority; internet hosting, multi-user authentication, unattended installation, and agent self-update are not enabled.
 

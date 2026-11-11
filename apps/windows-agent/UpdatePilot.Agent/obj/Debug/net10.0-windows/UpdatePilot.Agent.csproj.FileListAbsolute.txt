@@ -15,3 +15,4 @@ C:\Users\jchan\OneDrive\Desktop\D\Gamage\New folder\UpdatePilot\apps\windows-age
 C:\Users\jchan\OneDrive\Desktop\D\Gamage\New folder\UpdatePilot\apps\windows-agent\UpdatePilot.Agent\obj\Debug\net10.0-windows\UpdatePilot.Agent.pdb
 C:\Users\jchan\OneDrive\Desktop\D\Gamage\New folder\UpdatePilot\apps\windows-agent\UpdatePilot.Agent\obj\Debug\net10.0-windows\UpdatePilot.Agent.genruntimeconfig.cache
 C:\Users\jchan\OneDrive\Desktop\D\Gamage\New folder\UpdatePilot\apps\windows-agent\UpdatePilot.Agent\obj\Debug\net10.0-windows\ref\UpdatePilot.Agent.dll
+C:\Users\jchan\OneDrive\Desktop\D\Gamage\New folder\UpdatePilot\apps\windows-agent\UpdatePilot.Agent\bin\Debug\net10.0-windows\Scripts\Get-InstallerVerification.ps1

@@ -11,6 +11,9 @@ const string sample = """
 const string updateSample = """
 {"packageId":"VideoLAN.VLC","installedVersion":"3.0.20","targetVersion":"3.0.23","installerType":"exe","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scope":"machine","snapshotId":"00000000-0000-4000-8000-000000000001","previewJobId":"00000000-0000-4000-8000-000000000002"}
 """;
+const string verificationSample = """
+{"schemaVersion":1,"packageId":"VideoLAN.VLC","targetVersion":"3.0.23","installerType":"exe","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","architecture":"x64","architectureCompatible":true,"hashMatched":true,"signature":{"status":"Valid","signerSubject":"CN=VideoLAN, O=VideoLAN","signerThumbprint":"ABC123","timestamped":true},"publisherMatch":"unverified","verifiedAt":"2026-11-11T10:00:00Z","installationEnabled":false}
+""";
 var tests = new (string Name, Action Run)[]
 {
     ("Preserves package identities, nonstandard installed versions, and historical versions", () =>
@@ -55,6 +58,25 @@ var tests = new (string Name, Action Run)[]
     }),
     ("Rejects missing update status", () => Reject(sample.Replace("\"isUpdateAvailable\":true,", ""))),
     ("Rejects contaminated JSON output", () => Reject("Warning: failed\n" + sample)),
+    ("Installer verification accepts structured evidence and keeps installation disabled", () =>
+    {
+        Require(ValidVerification(verificationSample, updateSample));
+        Require(ValidVerification(verificationSample
+            .Replace("\"x64\"", "\"unknown\"")
+            .Replace("\"architectureCompatible\":true", "\"architectureCompatible\":false"), updateSample));
+    }),
+    ("Installer verification rejects identity drift, unmatched hashes, unknown signature status, and installation enablement", () =>
+    {
+        foreach (var invalid in new[]
+        {
+            verificationSample.Replace("\"targetVersion\":\"3.0.23\"", "\"targetVersion\":\"3.0.24\""),
+            verificationSample.Replace("\"hashMatched\":true", "\"hashMatched\":false"),
+            verificationSample.Replace("\"status\":\"Valid\"", "\"status\":\"Bypassed\""),
+            verificationSample.Replace("\"installationEnabled\":false", "\"installationEnabled\":true"),
+            verificationSample.Replace("\"architectureCompatible\":true", "\"architectureCompatible\":\"yes\""),
+            verificationSample.Replace("\"timestamped\":true", "\"timestamped\":null")
+        }) Require(!ValidVerification(invalid, updateSample));
+    }),
     ("Update requests require exact identity, version, installer metadata, and binding", () =>
     {
         Require(ValidUpdate(updateSample));
@@ -87,7 +109,18 @@ return failures == 0 ? 0 : 1;
 static void Require(bool condition) { if (!condition) throw new Exception("Contract assertion failed."); }
 static bool ValidUpdate(string json)
 {
-    try { UpdateRunner.Validate(JsonDocument.Parse(json).RootElement); return true; }
+    try { using var document = JsonDocument.Parse(json); UpdateRunner.Validate(document.RootElement); return true; }
+    catch (Exception) { return false; }
+}
+static bool ValidVerification(string result, string request)
+{
+    try
+    {
+        using var resultDocument = JsonDocument.Parse(result);
+        using var requestDocument = JsonDocument.Parse(request);
+        InstallerVerifier.ValidateResult(resultDocument.RootElement, requestDocument.RootElement);
+        return true;
+    }
     catch (Exception) { return false; }
 }
 static void Reject(string json)

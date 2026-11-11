@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("UpdatePilot.Agent")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b2fa615aa47fbcf7838652211593128ee664944a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+51e25e8c4e7ad74477dd74c8d5ccaaf937e629d6")]
 [assembly: System.Reflection.AssemblyProductAttribute("UpdatePilot.Agent")]
 [assembly: System.Reflection.AssemblyTitleAttribute("UpdatePilot.Agent")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

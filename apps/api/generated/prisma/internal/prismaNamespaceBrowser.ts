@@ -117,6 +117,7 @@ export const ScanJobScalarFieldEnum = {
   operation: 'operation',
   request: 'request',
   preview: 'preview',
+  verification: 'verification',
   createdAt: 'createdAt',
   expiresAt: 'expiresAt',
   startedAt: 'startedAt',

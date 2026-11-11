@@ -64,6 +64,7 @@ export type ScanJobCountAggregateOutputType = {
   operation: number
   request: number
   preview: number
+  verification: number
   createdAt: number
   expiresAt: number
   startedAt: number
@@ -116,6 +117,7 @@ export type ScanJobCountAggregateInputType = {
   operation?: true
   request?: true
   preview?: true
+  verification?: true
   createdAt?: true
   expiresAt?: true
   startedAt?: true
@@ -207,6 +209,7 @@ export type ScanJobGroupByOutputType = {
   operation: string
   request: runtime.JsonValue | null
   preview: runtime.JsonValue | null
+  verification: runtime.JsonValue | null
   createdAt: Date
   expiresAt: Date
   startedAt: Date | null
@@ -246,6 +249,7 @@ export type ScanJobWhereInput = {
   operation?: Prisma.StringFilter<"ScanJob"> | string
   request?: Prisma.JsonNullableFilter<"ScanJob">
   preview?: Prisma.JsonNullableFilter<"ScanJob">
+  verification?: Prisma.JsonNullableFilter<"ScanJob">
   createdAt?: Prisma.DateTimeFilter<"ScanJob"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"ScanJob"> | Date | string
   startedAt?: Prisma.DateTimeNullableFilter<"ScanJob"> | Date | string | null
@@ -266,6 +270,7 @@ export type ScanJobOrderByWithRelationInput = {
   operation?: Prisma.SortOrder
   request?: Prisma.SortOrderInput | Prisma.SortOrder
   preview?: Prisma.SortOrderInput | Prisma.SortOrder
+  verification?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   startedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -289,6 +294,7 @@ export type ScanJobWhereUniqueInput = Prisma.AtLeast<{
   operation?: Prisma.StringFilter<"ScanJob"> | string
   request?: Prisma.JsonNullableFilter<"ScanJob">
   preview?: Prisma.JsonNullableFilter<"ScanJob">
+  verification?: Prisma.JsonNullableFilter<"ScanJob">
   createdAt?: Prisma.DateTimeFilter<"ScanJob"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"ScanJob"> | Date | string
   startedAt?: Prisma.DateTimeNullableFilter<"ScanJob"> | Date | string | null
@@ -309,6 +315,7 @@ export type ScanJobOrderByWithAggregationInput = {
   operation?: Prisma.SortOrder
   request?: Prisma.SortOrderInput | Prisma.SortOrder
   preview?: Prisma.SortOrderInput | Prisma.SortOrder
+  verification?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   startedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -333,6 +340,7 @@ export type ScanJobScalarWhereWithAggregatesInput = {
   operation?: Prisma.StringWithAggregatesFilter<"ScanJob"> | string
   request?: Prisma.JsonNullableWithAggregatesFilter<"ScanJob">
   preview?: Prisma.JsonNullableWithAggregatesFilter<"ScanJob">
+  verification?: Prisma.JsonNullableWithAggregatesFilter<"ScanJob">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ScanJob"> | Date | string
   expiresAt?: Prisma.DateTimeWithAggregatesFilter<"ScanJob"> | Date | string
   startedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ScanJob"> | Date | string | null
@@ -349,6 +357,7 @@ export type ScanJobCreateInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -369,6 +378,7 @@ export type ScanJobUncheckedCreateInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -385,6 +395,7 @@ export type ScanJobUpdateInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -405,6 +416,7 @@ export type ScanJobUncheckedUpdateInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -423,6 +435,7 @@ export type ScanJobCreateManyInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -439,6 +452,7 @@ export type ScanJobUpdateManyMutationInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -457,6 +471,7 @@ export type ScanJobUncheckedUpdateManyInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -485,6 +500,7 @@ export type ScanJobCountOrderByAggregateInput = {
   operation?: Prisma.SortOrder
   request?: Prisma.SortOrder
   preview?: Prisma.SortOrder
+  verification?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   expiresAt?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
@@ -621,6 +637,7 @@ export type ScanJobCreateWithoutDeviceInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -639,6 +656,7 @@ export type ScanJobUncheckedCreateWithoutDeviceInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -686,6 +704,7 @@ export type ScanJobScalarWhereInput = {
   operation?: Prisma.StringFilter<"ScanJob"> | string
   request?: Prisma.JsonNullableFilter<"ScanJob">
   preview?: Prisma.JsonNullableFilter<"ScanJob">
+  verification?: Prisma.JsonNullableFilter<"ScanJob">
   createdAt?: Prisma.DateTimeFilter<"ScanJob"> | Date | string
   expiresAt?: Prisma.DateTimeFilter<"ScanJob"> | Date | string
   startedAt?: Prisma.DateTimeNullableFilter<"ScanJob"> | Date | string | null
@@ -702,6 +721,7 @@ export type ScanJobCreateWithoutAgentInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -720,6 +740,7 @@ export type ScanJobUncheckedCreateWithoutAgentInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -763,6 +784,7 @@ export type ScanJobCreateManyDeviceInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -779,6 +801,7 @@ export type ScanJobUpdateWithoutDeviceInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -797,6 +820,7 @@ export type ScanJobUncheckedUpdateWithoutDeviceInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -814,6 +838,7 @@ export type ScanJobUncheckedUpdateManyWithoutDeviceInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -831,6 +856,7 @@ export type ScanJobCreateManyAgentInput = {
   operation?: string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   expiresAt: Date | string
   startedAt?: Date | string | null
@@ -847,6 +873,7 @@ export type ScanJobUpdateWithoutAgentInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -865,6 +892,7 @@ export type ScanJobUncheckedUpdateWithoutAgentInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -882,6 +910,7 @@ export type ScanJobUncheckedUpdateManyWithoutAgentInput = {
   operation?: Prisma.StringFieldUpdateOperationsInput | string
   request?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   preview?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  verification?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -902,6 +931,7 @@ export type ScanJobSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   operation?: boolean
   request?: boolean
   preview?: boolean
+  verification?: boolean
   createdAt?: boolean
   expiresAt?: boolean
   startedAt?: boolean
@@ -922,6 +952,7 @@ export type ScanJobSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   operation?: boolean
   request?: boolean
   preview?: boolean
+  verification?: boolean
   createdAt?: boolean
   expiresAt?: boolean
   startedAt?: boolean
@@ -942,6 +973,7 @@ export type ScanJobSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   operation?: boolean
   request?: boolean
   preview?: boolean
+  verification?: boolean
   createdAt?: boolean
   expiresAt?: boolean
   startedAt?: boolean
@@ -962,6 +994,7 @@ export type ScanJobSelectScalar = {
   operation?: boolean
   request?: boolean
   preview?: boolean
+  verification?: boolean
   createdAt?: boolean
   expiresAt?: boolean
   startedAt?: boolean
@@ -972,7 +1005,7 @@ export type ScanJobSelectScalar = {
   error?: boolean
 }
 
-export type ScanJobOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "deviceId" | "agentId" | "state" | "operation" | "request" | "preview" | "createdAt" | "expiresAt" | "startedAt" | "finishedAt" | "leaseHash" | "snapshotId" | "resultHash" | "error", ExtArgs["result"]["scanJob"]>
+export type ScanJobOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "deviceId" | "agentId" | "state" | "operation" | "request" | "preview" | "verification" | "createdAt" | "expiresAt" | "startedAt" | "finishedAt" | "leaseHash" | "snapshotId" | "resultHash" | "error", ExtArgs["result"]["scanJob"]>
 export type ScanJobInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   device?: boolean | Prisma.DeviceDefaultArgs<ExtArgs>
   agent?: boolean | Prisma.ScanJob$agentArgs<ExtArgs>
@@ -1000,6 +1033,7 @@ export type $ScanJobPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     operation: string
     request: runtime.JsonValue | null
     preview: runtime.JsonValue | null
+    verification: runtime.JsonValue | null
     createdAt: Date
     expiresAt: Date
     startedAt: Date | null
@@ -1440,6 +1474,7 @@ export interface ScanJobFieldRefs {
   readonly operation: Prisma.FieldRef<"ScanJob", 'String'>
   readonly request: Prisma.FieldRef<"ScanJob", 'Json'>
   readonly preview: Prisma.FieldRef<"ScanJob", 'Json'>
+  readonly verification: Prisma.FieldRef<"ScanJob", 'Json'>
   readonly createdAt: Prisma.FieldRef<"ScanJob", 'DateTime'>
   readonly expiresAt: Prisma.FieldRef<"ScanJob", 'DateTime'>
   readonly startedAt: Prisma.FieldRef<"ScanJob", 'DateTime'>

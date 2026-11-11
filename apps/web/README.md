@@ -10,7 +10,13 @@ Preview jobs and scan jobs share one per-device execution slot. The dialog follo
 
 The backend now recognizes a server-built `update` job operation, and the Windows agent acknowledges it with a safe `update_blocked` result. A browser request to `/api/v1/control/update` may supply only `{recordId}`; the backend re-derives the exact package ID, installed version, target version, installer type, and SHA-256 from the latest stored scan and the latest completed preview. No commands, installer URLs, or browser-provided hashes are accepted.
 
-Update job creation is gated by `UPDATE_EXECUTION_ENABLED` (default `false`) plus known scope, known architecture, and verified installer signature. Current previews cannot satisfy the verification gates, so the endpoint returns a structured blocked response and creates no job. The agent never runs `winget upgrade` or arbitrary PowerShell in this milestone. Post-update re-scanning, version verification, and install history remain future work.
+Update job creation is gated by `UPDATE_EXECUTION_ENABLED` (default `false`), known scope, a matching verification job, a known compatible architecture, and a valid installer signature. The agent never runs `winget upgrade` or arbitrary PowerShell in this milestone. Post-update re-scanning, version verification, and install history remain future work.
+
+## Installer verification
+
+The confirmation page offers **Verify installer**. It posts only `{recordId}` to `/api/agent/verify`, which queues a separate read-only `verify` job. The agent downloads the exact version-pinned installer with `winget download` into a temporary job folder, requires exactly one downloaded file to match the preview SHA-256, checks the Authenticode signature, and inspects PE or MSI architecture. It deletes the temporary files and uploads evidence; it never executes the installer.
+
+The backend re-binds the evidence to the stored preview and scan, recomputes publisher-match evidence, and stores it on the verify job. Execution remains disabled: verification only populates architecture and signature evidence, and the safety gate still returns a structured blocked response for any update request. Apply the additive verification migration and restart the backend and agent listener before using this screen.
 
 ## Real Scan Now and agent settings
 
