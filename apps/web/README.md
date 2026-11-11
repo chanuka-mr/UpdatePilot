@@ -6,6 +6,12 @@ Real update candidates on `/updates` (and the WinGet application inventory view)
 
 Preview jobs and scan jobs share one per-device execution slot. The dialog follows its requested latest job; if another job supersedes status, request a fresh preview after it finishes. Closing a dialog does not cancel a queued job. Results remain stored in PostgreSQL but are not scan-history or install-history events. Existing servers started with `npm start` and old agent listeners must be restarted after updating; the additive preview migration must be applied.
 
+## Hard-blocked update execution foundation
+
+The backend now recognizes a server-built `update` job operation, and the Windows agent acknowledges it with a safe `update_blocked` result. A browser request to `/api/v1/control/update` may supply only `{recordId}`; the backend re-derives the exact package ID, installed version, target version, installer type, and SHA-256 from the latest stored scan and the latest completed preview. No commands, installer URLs, or browser-provided hashes are accepted.
+
+Update job creation is gated by `UPDATE_EXECUTION_ENABLED` (default `false`) plus known scope, known architecture, and verified installer signature. Current previews cannot satisfy the verification gates, so the endpoint returns a structured blocked response and creates no job. The agent never runs `winget upgrade` or arbitrary PowerShell in this milestone. Post-update re-scanning, version verification, and install history remain future work.
+
 ## Real Scan Now and agent settings
 
 Settings now provides pairing, revocation, heartbeat status, and scan-job controls. Generate a pairing code, run the agent with `--pair` and then `--listen` as described in `../windows-agent/README.md`, and keep its terminal open. Overview includes the same real Scan Now control. Pairing codes expire after five minutes. Status polls every five seconds; a scan initiated in that page refreshes it when the job completes. Reloading the page still shows the latest persisted job, but may require Refresh stored data after completion. The UI never receives the device credential or database password.

@@ -5,9 +5,10 @@ import type { PrismaClient } from '../../../generated/prisma/client.js';
 import { contentHash, snapshotSchema } from '../inventory/inventory.js';
 import { saveSnapshot } from '../inventory/save-snapshot.js';
 import { previewRequestSchema, previewResultSchema } from './preview.js';
+import { evaluateUpdateGate, updateControlSchema } from './update.js';
 export const hashSecret = (value:string) => createHash('sha256').update(value).digest('hex');
 export const isOnline = (last:Date|null, revoked:Date|null, now=Date.now()) => !revoked && !!last && now-last.getTime()<45000;
-export class ApiError extends Error { constructor(public status:number,message:string){super(message);} }
+export class ApiError extends Error { constructor(public status:number,message:string,public details?:Record<string,unknown>){super(message);} }
 export async function body(req:IncomingMessage) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new ApiError(415,'JSON required');
   const chunks:Buffer[]=[];let length=0;
@@ -68,6 +69,27 @@ export async function control(db:PrismaClient,key:string,action:string,method:st
       return {jobId:job.id,state:job.state};
     },{isolationLevel:'Serializable'});
   }
+  if(action==='update'&&method==='POST') {
+    const {recordId}=updateControlSchema.parse(payload);
+    return db.$transaction(async tx=>{
+      const agent=await tx.agentCredential.findFirst({where:{deviceId:device.id,revokedAt:null},orderBy:{createdAt:'desc'}});
+      const latest=await tx.inventorySnapshot.findFirst({where:{deviceId:device.id},orderBy:{scannedAt:'desc'}});
+      const candidate=latest?await tx.winGetPackage.findFirst({where:{id:recordId,snapshotId:latest.id}}):null;
+      const previewJob=await tx.scanJob.findFirst({where:{deviceId:device.id,operation:'preview',state:'completed'},orderBy:{createdAt:'desc'}});
+      const active=await tx.scanJob.findFirst({where:{deviceId:device.id,state:{in:['queued','running']}}});
+      const gate=evaluateUpdateGate({
+        executionEnabled:process.env.UPDATE_EXECUTION_ENABLED==='true',
+        agentOnline:!!agent&&isOnline(agent.lastSeenAt,agent.revokedAt),
+        snapshot:latest?{id:latest.id,scannedAt:latest.scannedAt,wingetStatus:latest.wingetStatus}:null,
+        candidate:candidate?{id:candidate.id,packageId:candidate.packageId,installedVersion:candidate.installedVersion,source:candidate.source,isUpdateAvailable:candidate.isUpdateAvailable,matchStatus:candidate.matchStatus}:null,
+        previewJob:previewJob?{id:previewJob.id,state:previewJob.state,createdAt:previewJob.createdAt,request:previewJob.request,preview:previewJob.preview}:null,
+        activeJob:!!active,
+      });
+      if(!gate.ok)throw new ApiError(409,'Update execution is blocked by safety checks.',{blockers:gate.blockers});
+      const job=await tx.scanJob.create({data:{deviceId:device.id,operation:'update',request:gate.request,state:'queued',expiresAt:new Date(Date.now()+10*60000)}});
+      return {jobId:job.id,state:job.state};
+    },{isolationLevel:'Serializable'});
+  }
   throw new ApiError(405,'Unsupported control operation');
 }
 export async function agentRequest(db:PrismaClient,req:IncomingMessage,action:string) {
@@ -99,13 +121,17 @@ export async function agentRequest(db:PrismaClient,req:IncomingMessage,action:st
     return {job:claimed.count?{id:job.id,operation:job.operation,request:job.request,lease}:null};
   }
   if(action==='result') {
-    const result=z.object({jobId:z.uuid(),lease:z.string().regex(/^[a-f0-9]{64}$/),snapshot:snapshotSchema.optional(),preview:previewResultSchema.optional(),error:z.enum(['scan_failed','scan_timeout','preview_failed']).optional()}).strict().refine(v=>[v.snapshot,v.preview,v.error].filter(Boolean).length===1).parse(await body(req));
+    const result=z.object({jobId:z.uuid(),lease:z.string().regex(/^[a-f0-9]{64}$/),snapshot:snapshotSchema.optional(),preview:previewResultSchema.optional(),error:z.enum(['scan_failed','scan_timeout','preview_failed','update_blocked']).optional()}).strict().refine(v=>[v.snapshot,v.preview,v.error].filter(Boolean).length===1).parse(await body(req));
     return db.$transaction(async tx=>{
       const validAgent=await tx.agentCredential.findUnique({where:{id:agent.id}});
       if(!validAgent||validAgent.revokedAt)throw new ApiError(401,'Agent revoked');
       const job=await tx.scanJob.findFirst({where:{id:result.jobId,deviceId:agent.deviceId,agentId:agent.id,leaseHash:hashSecret(result.lease)}});
       if(!job)throw new ApiError(403,'Job does not belong to this agent');
-      if(job.operation==='scan'&&result.preview||job.operation==='preview'&&result.snapshot)throw new ApiError(400,'Result does not match job operation');
+      if(!['scan','preview','update'].includes(job.operation))throw new ApiError(400,'Unsupported job operation');
+      if((job.operation==='scan'&&(result.preview||result.error==='update_blocked'))||
+        (job.operation==='preview'&&(result.snapshot||result.error==='update_blocked'))||
+        (job.operation==='update'&&(result.snapshot||result.preview||(result.error!==undefined&&result.error!=='update_blocked'))))
+        throw new ApiError(400,'Result does not match job operation');
       if(result.preview){const requested=previewRequestSchema.parse(job.request);if(result.preview.packageId!==requested.packageId)throw new ApiError(400,'Preview package identity mismatch');}
       const fingerprint=result.snapshot?contentHash(result.snapshot):result.preview?hashSecret(JSON.stringify(result.preview)):result.error!;
       if(['completed','failed'].includes(job.state)&&job.resultHash===fingerprint)return {ok:true,snapshotId:job.snapshotId};

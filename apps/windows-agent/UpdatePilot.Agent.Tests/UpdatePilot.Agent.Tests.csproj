@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\UpdatePilot.Agent\WinGetScanner.cs" Link="WinGetScanner.cs" />
+    <Compile Include="..\UpdatePilot.Agent\UpdateRunner.cs" Link="UpdateRunner.cs" />
   </ItemGroup>
 </Project>

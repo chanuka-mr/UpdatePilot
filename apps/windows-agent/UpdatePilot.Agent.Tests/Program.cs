@@ -8,6 +8,9 @@ const string sample = """
   {"name":"AnyDesk","id":"AnyDesk.AnyDesk","installedVersion":"ad 9.7.13","source":"winget","isUpdateAvailable":true,"availableVersions":["9.8.3"]}
 ]}
 """;
+const string updateSample = """
+{"packageId":"VideoLAN.VLC","installedVersion":"3.0.20","targetVersion":"3.0.23","installerType":"exe","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scope":"machine","snapshotId":"00000000-0000-4000-8000-000000000001","previewJobId":"00000000-0000-4000-8000-000000000002"}
+""";
 var tests = new (string Name, Action Run)[]
 {
     ("Preserves package identities, nonstandard installed versions, and historical versions", () =>
@@ -51,7 +54,26 @@ var tests = new (string Name, Action Run)[]
         Require(inventory.Packages.Single(package => package.IsUpdateAvailable).Id == "Docker.DockerDesktop");
     }),
     ("Rejects missing update status", () => Reject(sample.Replace("\"isUpdateAvailable\":true,", ""))),
-    ("Rejects contaminated JSON output", () => Reject("Warning: failed\n" + sample))
+    ("Rejects contaminated JSON output", () => Reject("Warning: failed\n" + sample)),
+    ("Update requests require exact identity, version, installer metadata, and binding", () =>
+    {
+        Require(ValidUpdate(updateSample));
+        foreach (var invalid in new[]
+        {
+            updateSample.Replace("\"VideoLAN.VLC\"", "\"; whoami\""),
+            updateSample.Replace("\"VideoLAN.VLC\"", "\"https://example.com\""),
+            updateSample.Replace("\"machine\"", "\"unknown\""),
+            updateSample.Replace("\"exe\"", "\"\""),
+            updateSample.Replace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "not-a-hash"),
+            updateSample.Replace("00000000-0000-4000-8000-000000000002", "not-a-guid")
+        }) Require(!ValidUpdate(invalid));
+    }),
+    ("Update requests reject browser-supplied command or installer URL properties", () =>
+    {
+        var trimmed = updateSample.TrimEnd();
+        Require(!ValidUpdate(trimmed[..^1] + ",\"command\":\"winget upgrade\"}"));
+        Require(!ValidUpdate(trimmed[..^1] + ",\"installerUrl\":\"https://example.com/file.exe\"}"));
+    })
 };
 var failures = 0;
 foreach (var test in tests)
@@ -63,6 +85,11 @@ Console.WriteLine($"{tests.Length - failures}/{tests.Length} checks passed.");
 return failures == 0 ? 0 : 1;
 
 static void Require(bool condition) { if (!condition) throw new Exception("Contract assertion failed."); }
+static bool ValidUpdate(string json)
+{
+    try { UpdateRunner.Validate(JsonDocument.Parse(json).RootElement); return true; }
+    catch (Exception) { return false; }
+}
 static void Reject(string json)
 {
     try { WinGetScanner.Parse(json); }

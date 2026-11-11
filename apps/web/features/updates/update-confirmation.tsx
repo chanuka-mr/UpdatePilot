@@ -57,6 +57,13 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
 
   const identityReady=!!preview&&preview.selectionValidated&&!!preview.targetVersion&&!!preview.installerType&&!!preview.installerSha256;
   const canConfirm=identityReady&&acknowledged&&!confirmed;
+  const executionBlockers=preview?[
+    preview.selectionValidated?null:'Current-device selection was not validated',
+    preview.scope==='user'||preview.scope==='machine'?null:'Installation scope is unknown',
+    preview.architecture==='unknown'?'Installer architecture is unknown':null,
+    preview.signatureVerified===true?null:'Installer signature is not verified',
+    'Update execution is disabled in this build',
+  ].filter((value):value is string=>value!==null):[];
 
   return <><Link href="/updates" className="text-xs text-muted">← Updates / Confirm Update</Link>
     <Heading title="Confirm Update" description="Review the exact target release, installer identity, and warnings before confirming."/>
@@ -93,6 +100,12 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
         <li className="rounded-lg bg-inset p-3 text-muted">Architecture, scope compatibility, and reboot requirements are not verified.</li>
         <li className="rounded-lg bg-inset p-3 text-muted">A catalog candidate is not an approved installation target.</li>
       </ul>
+    </section>}
+    {preview&&<section className="panel p-6">
+      <h2 className="flex items-center gap-2 text-lg font-semibold"><ShieldAlert size={20} className="text-amber-600"/>Execution safety gate</h2>
+      <p className="mt-2 text-sm text-muted">The controlled update workflow is hard-blocked until every check passes. Confirming this page does not queue an update job or run an installer.</p>
+      <ul className="mt-4 space-y-2 text-sm">{executionBlockers.map(blocker=><li key={blocker} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-900"><ShieldAlert size={16} className="mt-0.5 shrink-0"/>{blocker}</li>)}</ul>
+      <p className="mt-4 rounded-lg bg-inset p-3 text-xs leading-5 text-muted">{preview.scope==='machine'?'Machine-scope upgrades typically require administrator elevation and may show a UAC prompt.':preview.scope==='user'?'Current-user scope may not require elevation, but WinGet can still prompt.':'Elevation requirements cannot be determined while the installation scope is unknown.'}</p>
     </section>}
     <section className="panel p-6">
       <h2 className="text-lg font-semibold">Explicit confirmation</h2>

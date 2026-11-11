@@ -29,8 +29,8 @@ const server = createServer(async (req, res) => {
   const expected = Buffer.from(`Bearer ${token}`);
   if (supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) { send(401, { error: "Unauthorized" }); return; }
   if(url.pathname.startsWith('/api/v1/control/')) {
-    try{send(200,await control(db,deviceKey,url.pathname.slice('/api/v1/control/'.length),req.method||'',url.pathname==='/api/v1/control/preview'?await body(req):undefined));}
-    catch(error){send(error instanceof ApiError?error.status:503,{error:error instanceof ApiError?error.message:'Control request failed. Retry after checking the database migration.'});}
+    try{send(200,await control(db,deviceKey,url.pathname.slice('/api/v1/control/'.length),req.method||'',['/api/v1/control/preview','/api/v1/control/update'].includes(url.pathname)?await body(req):undefined));}
+    catch(error){if(error instanceof ApiError)send(error.status,{error:error.message,...(error.details?{details:error.details}:{})});else send(503,{error:'Control request failed. Retry after checking the database migration.'});}
     return;
   }
   if (req.method !== "GET") { res.setHeader("Allow", "GET"); send(405, { error: "Read-only API" }); return; }

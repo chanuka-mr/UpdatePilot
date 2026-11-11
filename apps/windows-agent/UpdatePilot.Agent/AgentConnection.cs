@@ -41,7 +41,7 @@ internal static class AgentConnection
             using var instanceLock = new FileStream(Path.Combine(state, "listener.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             var credential = Encoding.UTF8.GetString(UserProtection.Transform(await File.ReadAllBytesAsync(credentialPath, cancel.Token), true));
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", credential);
-            Console.WriteLine("Agent listening for scan and read-only metadata-preview jobs. Keep this terminal open. Ctrl+C stops it.");
+            Console.WriteLine("Agent listening for scan, preview, and update jobs. Keep this terminal open. Ctrl+C stops it.");
             while (!cancel.IsCancellationRequested)
             {
                 try
@@ -52,11 +52,12 @@ internal static class AgentConnection
                     if (claim.TryGetProperty("job", out var job) && job.ValueKind != JsonValueKind.Null)
                     {
                         var operation = job.GetProperty("operation").GetString();
-                        if (operation is not ("scan" or "preview")) throw new InvalidOperationException("Unsupported job operation.");
+                        if (operation is not ("scan" or "preview" or "update")) throw new InvalidOperationException("Unsupported job operation.");
                         var id = job.GetProperty("id").GetString()!;
                         if (!Guid.TryParse(id, out _)) throw new InvalidOperationException("Invalid job ID.");
                         var lease = job.GetProperty("lease").GetString()!;
                         if(operation=="preview")await PreviewAndUpload(client,state,id,lease,job.GetProperty("request"),cancel.Token);
+                        else if(operation=="update")await UpdateAndUpload(client,state,id,lease,job.GetProperty("request"),cancel.Token);
                         else await ScanAndUpload(client, state, id, lease, cancel.Token);
                     }
                 }
@@ -135,6 +136,15 @@ internal static class AgentConnection
         var pending=Path.Combine(state,"pending.bin");
         await File.WriteAllBytesAsync(pending+".tmp",UserProtection.Transform(Encoding.UTF8.GetBytes(envelope),false),cancellationToken);File.Move(pending+".tmp",pending,overwrite:true);
         Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Read-only preview result uploaded. Installation remains disabled.":"Preview result rejected. No installation was attempted.");
+    }
+    private static async Task UpdateAndUpload(HttpClient client,string state,string id,string lease,JsonElement request,CancellationToken cancellationToken)
+    {
+        string envelope;
+        try{envelope=UpdateRunner.BlockedEnvelope(id,lease,request);}
+        catch(InvalidOperationException){envelope=JsonSerializer.Serialize(new{jobId=id,lease,error="update_blocked"});}
+        var pending=Path.Combine(state,"pending.bin");
+        await File.WriteAllBytesAsync(pending+".tmp",UserProtection.Transform(Encoding.UTF8.GetBytes(envelope),false),cancellationToken);File.Move(pending+".tmp",pending,overwrite:true);
+        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Update job blocked by safety checks. No installation was attempted.":"Update job result rejected. No installation was attempted.");
     }
     private static async Task<bool> UploadPending(HttpClient client, string state, CancellationToken cancellationToken)
     {

@@ -11,6 +11,8 @@ export type UpdatePreviewData = {
   status: string;
   reason: string;
   checkedAt: string;
+  signatureVerified: boolean;
+  installationEnabled: boolean;
 };
 
 const storageKey = (recordId: string) => `updatepilot:preview:${recordId}`;
