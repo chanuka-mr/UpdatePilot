@@ -53,7 +53,7 @@ try {
         }
     }
     $result.status='incomplete'
-    if ($result.selectionValidated) {$result.reason='WinGet selected a version-pinned installer for this device and declared its type and SHA-256. Architecture, installed-to-selected scope compatibility, signature verification, reboot requirements, and release metadata are not verified. Installation remains disabled.'}
-    else {$result.reason='Catalog candidate resolved, but an exact WinGet installer selection with a declared type and SHA-256 could not be confirmed. Installation remains disabled.'}
+    if ($result.selectionValidated) {$result.reason='WinGet selected a version-pinned installer for this device and declared its type and SHA-256. Architecture, installed-to-selected scope compatibility, signature verification, reboot requirements, and release metadata are not verified. No installer was downloaded or executed.'}
+    else {$result.reason='Catalog candidate resolved, but an exact WinGet installer selection with a declared type and SHA-256 could not be confirmed. No installer was downloaded or executed.'}
     ConvertTo-Json -InputObject $result -Depth 4 -Compress
 } catch {[Console]::Error.WriteLine('Read-only WinGet preview failed. Check source availability and module compatibility.');exit 1}

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createDatabase } from '../src/database.ts';
+import { createDatabase } from '../src/config/database.ts';
 const db=createDatabase();const port=14021;const key=`agent-test-${randomUUID()}`;
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const allowed=path.resolve(root,'windows-agent','data');const state=path.resolve(allowed,key);

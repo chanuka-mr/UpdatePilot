@@ -12,12 +12,12 @@ const snapshot = { id: snapshotId, scannedAt: new Date('2026-11-02T09:00:00Z'), 
 const candidate = { id: candidateId, packageId: 'VideoLAN.VLC', installedVersion: '3.0.20', source: 'winget', isUpdateAvailable: true, matchStatus: 'matched' };
 const request = {
   packageId: 'VideoLAN.VLC', installedVersion: '3.0.20', targetVersion: '3.0.23',
-  installerType: 'exe', installerSha256: hash, scope: 'machine', snapshotId, previewJobId,
+  installerType: 'inno', installerSha256: hash, scope: 'machine', profile: 'inno-machine', snapshotId, previewJobId,
 };
 const preview = {
   schemaVersion: 1, packageId: 'VideoLAN.VLC', source: 'winget', checkedAt: '2026-11-02T10:00:00Z',
   installedVersion: '3.0.20', targetVersion: '3.0.23', publisher: 'VideoLAN', scope: 'machine',
-  architecture: 'unknown', installerType: 'exe', installerSha256: hash, selectionValidated: true,
+  architecture: 'unknown', installerType: 'inno', installerSha256: hash, selectionValidated: true,
   status: 'incomplete', reason: 'Installer applicability is not verified.', signatureVerified: false,
   installationEnabled: false,
 };
@@ -26,7 +26,7 @@ const previewJob = {
   request: { packageId: 'VideoLAN.VLC', installedVersion: '3.0.20', snapshotId }, preview,
 };
 const verification = {
-  schemaVersion: 1, packageId: 'VideoLAN.VLC', targetVersion: '3.0.23', installerType: 'exe',
+  schemaVersion: 1, packageId: 'VideoLAN.VLC', targetVersion: '3.0.23', installerType: 'inno',
   installerSha256: hash, architecture: 'x64', architectureCompatible: true, hashMatched: true,
   signature: { status: 'Valid', signerSubject: 'CN=VideoLAN, O=VideoLAN', signerThumbprint: 'ABC123', timestamped: true },
   publisherMatch: 'matched', verifiedAt: '2026-11-02T10:15:00Z', installationEnabled: false,
@@ -72,7 +72,14 @@ test('update requests reject extra properties and invalid installer evidence', (
     { ...request, packageId: '; whoami' },
     { ...request, installerSha256: 'not-a-hash' },
     { ...request, scope: 'unknown' },
+    { ...request, profile: 'exe-machine' },
   ]) assert.equal(updateRequestSchema.safeParse(bad).success, false);
+  const { profile: _profile, ...withoutProfile } = request;
+  assert.equal(updateRequestSchema.safeParse(withoutProfile).success, false);
+});
+
+test('update gate blocks installers without an allowlisted execution profile', () => {
+  assert.ok(blockers({ ...base, previewJob: { ...previewJob, preview: { ...preview, installerType: 'exe' } } }).includes('execution_profile_unavailable'));
 });
 
 test('update execution stays disabled until the server flag is enabled', () => {

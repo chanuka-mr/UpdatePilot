@@ -136,7 +136,7 @@ internal static class AgentConnection
         {cancellationToken.ThrowIfCancellationRequested();envelope=JsonSerializer.Serialize(new{jobId=id,lease,error="preview_failed"});}
         var pending=Path.Combine(state,"pending.bin");
         await File.WriteAllBytesAsync(pending+".tmp",UserProtection.Transform(Encoding.UTF8.GetBytes(envelope),false),cancellationToken);File.Move(pending+".tmp",pending,overwrite:true);
-        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Read-only preview result uploaded. Installation remains disabled.":"Preview result rejected. No installation was attempted.");
+        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Read-only preview result uploaded. No installer was downloaded or executed.":"Preview result rejected. No installation was attempted.");
     }
     private static async Task VerifyAndUpload(HttpClient client,string state,string id,string lease,JsonElement request,CancellationToken cancellationToken)
     {
@@ -148,16 +148,30 @@ internal static class AgentConnection
         finally{try{if(Directory.Exists(directory))Directory.Delete(directory,true);}catch(IOException){}catch(UnauthorizedAccessException){}}
         var pending=Path.Combine(state,"pending.bin");
         await File.WriteAllBytesAsync(pending+".tmp",UserProtection.Transform(Encoding.UTF8.GetBytes(envelope),false),cancellationToken);File.Move(pending+".tmp",pending,overwrite:true);
-        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Installer verification uploaded. Installation remains disabled.":"Verification result rejected. No installation was attempted.");
+        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Installer verification uploaded. No installation was attempted.":"Verification result rejected. No installation was attempted.");
     }
     private static async Task UpdateAndUpload(HttpClient client,string state,string id,string lease,JsonElement request,CancellationToken cancellationToken)
     {
+        var directory=Path.Combine(state,"jobs",id);Directory.CreateDirectory(directory);
         string envelope;
-        try{envelope=UpdateRunner.BlockedEnvelope(id,lease,request);}
-        catch(InvalidOperationException){envelope=JsonSerializer.Serialize(new{jobId=id,lease,error="update_blocked"});}
+        try
+        {
+            var result=await UpdateRunner.ExecuteAsync(request,directory,
+                (stage,percent,message)=>Post(client,"progress",new{jobId=id,lease,stage,percent,message},cancellationToken),
+                ()=>Post(client,"heartbeat",new{},cancellationToken),cancellationToken);
+            envelope=JsonSerializer.Serialize(new{jobId=id,lease,updateResult=result});
+            Console.WriteLine($"Update execution finished with status {result.GetProperty("status").GetString()}.");
+        }
+        catch(Exception ex) when(ex is InvalidOperationException or JsonException or TaskCanceledException or TimeoutException or IOException or System.ComponentModel.Win32Exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Console.Error.WriteLine($"Update execution failed: {ex.GetType().Name}.");
+            envelope=JsonSerializer.Serialize(new{jobId=id,lease,error="update_failed"});
+        }
+        finally{try{if(Directory.Exists(directory))Directory.Delete(directory,true);}catch(IOException){}catch(UnauthorizedAccessException){}}
         var pending=Path.Combine(state,"pending.bin");
         await File.WriteAllBytesAsync(pending+".tmp",UserProtection.Transform(Encoding.UTF8.GetBytes(envelope),false),cancellationToken);File.Move(pending+".tmp",pending,overwrite:true);
-        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Update job blocked by safety checks. No installation was attempted.":"Update job result rejected. No installation was attempted.");
+        Console.WriteLine(await UploadPending(client,state,cancellationToken)?"Update result uploaded. Installation will be confirmed by a fresh scan when needed.":"Update result rejected. No installer will be automatically retried.");
     }
     private static async Task<bool> UploadPending(HttpClient client, string state, CancellationToken cancellationToken)
     {

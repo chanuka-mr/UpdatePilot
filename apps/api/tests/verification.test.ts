@@ -22,7 +22,7 @@ test('verify control accepts only a record id and rejects commands, package ids,
   assert.equal(verifyControlSchema.safeParse({ recordId }).success, true);
 });
 
-test('verification evidence is strict and installation remains disabled', () => {
+test('verification evidence is strict and cannot self-authorize installation', () => {
   assert.equal(verificationResultSchema.safeParse(verification).success, true);
   assert.equal(verificationResultSchema.safeParse({ ...verification, publisherMatch: 'mismatch' }).success, true);
   for (const bad of [

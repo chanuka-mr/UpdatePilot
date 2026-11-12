@@ -2,6 +2,24 @@ import { z } from 'zod';
 
 export const updateControlSchema = z.object({ recordId: z.uuid() }).strict();
 
+export const executionProfiles = [
+  'msi-user', 'msi-machine',
+  'inno-user', 'inno-machine',
+  'nsis-user', 'nsis-machine',
+  'burn-user', 'burn-machine',
+] as const;
+export type ExecutionProfile = typeof executionProfiles[number];
+
+export function deriveExecutionProfile(installerType: string, scope: 'user' | 'machine'): ExecutionProfile | null {
+  const family = installerType.trim().toLowerCase();
+  const profile = family === 'msi' || family === 'wix' ? 'msi'
+    : family === 'inno' ? 'inno'
+      : family === 'nullsoft' || family === 'nsis' ? 'nsis'
+        : family === 'burn' ? 'burn'
+          : null;
+  return profile ? `${profile}-${scope}` as ExecutionProfile : null;
+}
+
 export const updateRequestSchema = z.object({
   packageId: z.string().min(1).max(200).regex(/^[A-Za-z0-9][A-Za-z0-9.+_-]*$/),
   installedVersion: z.string().min(1).max(4096),
@@ -9,6 +27,7 @@ export const updateRequestSchema = z.object({
   installerType: z.string().min(1).max(128),
   installerSha256: z.string().regex(/^[A-Fa-f0-9]{64}$/),
   scope: z.enum(['user', 'machine']),
+  profile: z.enum(executionProfiles),
   snapshotId: z.uuid(),
   previewJobId: z.uuid(),
 }).strict();
@@ -28,6 +47,7 @@ export const updateBlockers = [
   'installer_identity_missing',
   'selection_unvalidated',
   'scope_unknown',
+  'execution_profile_unavailable',
   'verification_missing',
   'verification_stale',
   'verification_mismatch',
@@ -101,6 +121,9 @@ export function derivePreviewRequest(input: PreviewBindingInput): PreviewBinding
       blockers.add('installer_identity_missing');
     if (preview.selectionValidated !== true) blockers.add('selection_unvalidated');
     if (preview.scope !== 'user' && preview.scope !== 'machine') blockers.add('scope_unknown');
+    if ((preview.scope === 'user' || preview.scope === 'machine') &&
+      (typeof preview.installerType !== 'string' || !deriveExecutionProfile(preview.installerType, preview.scope)))
+      blockers.add('execution_profile_unavailable');
   }
 
   if (blockers.size > 0) return { ok: false, blockers: [...blockers] };
@@ -108,6 +131,9 @@ export function derivePreviewRequest(input: PreviewBindingInput): PreviewBinding
     typeof preview.targetVersion !== 'string' || typeof preview.installerType !== 'string' ||
     typeof preview.installerSha256 !== 'string' || (preview.scope !== 'user' && preview.scope !== 'machine'))
     return { ok: false, blockers: ['preview_missing'] };
+
+  const profile = deriveExecutionProfile(preview.installerType, preview.scope);
+  if (!profile) return { ok: false, blockers: ['execution_profile_unavailable'] };
 
   return {
     ok: true,
@@ -118,6 +144,7 @@ export function derivePreviewRequest(input: PreviewBindingInput): PreviewBinding
       installerType: preview.installerType,
       installerSha256: preview.installerSha256.toLowerCase(),
       scope: preview.scope,
+      profile,
       snapshotId: input.snapshot.id,
       previewJobId: job.id,
     }),

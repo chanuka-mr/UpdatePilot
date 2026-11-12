@@ -16,6 +16,7 @@ model Device {
   agents    AgentCredential[]
   pairings  PairingTicket[]
   scanJobs  ScanJob[]
+  updates   UpdateExecution[]
 }
 
 model AgentCredential {
@@ -49,6 +50,9 @@ model ScanJob {
   request      Json?
   preview      Json?
   verification Json?
+  progress     Json?
+  updateExecutionId String?    @db.Uuid
+  updateExecution   UpdateExecution? @relation(fields: [updateExecutionId], references: [id], onDelete: SetNull)
   createdAt    DateTime         @default(now()) @db.Timestamptz(3)
   expiresAt    DateTime         @db.Timestamptz(3)
   startedAt    DateTime?        @db.Timestamptz(3)
@@ -59,6 +63,38 @@ model ScanJob {
   error        String?
 
   @@index([deviceId, createdAt(sort: Desc)])
+  @@index([updateExecutionId])
+}
+
+model UpdateExecution {
+  id                String            @id @default(uuid()) @db.Uuid
+  deviceId          String            @db.Uuid
+  device            Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  packageId         String
+  name              String
+  installedVersion  String
+  targetVersion     String
+  sourceSnapshotId  String            @db.Uuid
+  previewJobId      String            @db.Uuid
+  verificationJobId String            @db.Uuid
+  installerType     String
+  installerSha256   String
+  scope             String
+  profile           String
+  status            String            @default("queued")
+  stage             String            @default("queued")
+  progress          Int               @default(0)
+  message           String?
+  error             String?
+  result            Json?
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  startedAt         DateTime?         @db.Timestamptz(3)
+  finishedAt        DateTime?         @db.Timestamptz(3)
+  confirmedAt       DateTime?         @db.Timestamptz(3)
+  scanJobs          ScanJob[]
+
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@index([status])
 }
 
 model InventorySnapshot {

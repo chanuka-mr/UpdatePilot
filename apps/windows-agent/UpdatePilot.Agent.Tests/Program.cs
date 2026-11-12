@@ -10,10 +10,13 @@ const string sample = """
 ]}
 """;
 const string updateSample = """
-{"packageId":"VideoLAN.VLC","installedVersion":"3.0.20","targetVersion":"3.0.23","installerType":"exe","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scope":"machine","snapshotId":"00000000-0000-4000-8000-000000000001","previewJobId":"00000000-0000-4000-8000-000000000002"}
+{"packageId":"VideoLAN.VLC","installedVersion":"3.0.20","targetVersion":"3.0.23","installerType":"inno","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scope":"machine","profile":"inno-machine","snapshotId":"00000000-0000-4000-8000-000000000001","previewJobId":"00000000-0000-4000-8000-000000000002"}
 """;
 const string verificationSample = """
-{"schemaVersion":1,"packageId":"VideoLAN.VLC","targetVersion":"3.0.23","installerType":"exe","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","architecture":"x64","architectureCompatible":true,"hashMatched":true,"signature":{"status":"Valid","signerSubject":"CN=VideoLAN, O=VideoLAN","signerThumbprint":"ABC123","timestamped":true},"publisherMatch":"unverified","verifiedAt":"2026-11-11T10:00:00Z","installationEnabled":false}
+{"schemaVersion":1,"packageId":"VideoLAN.VLC","targetVersion":"3.0.23","installerType":"inno","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","architecture":"x64","architectureCompatible":true,"hashMatched":true,"signature":{"status":"Valid","signerSubject":"CN=VideoLAN, O=VideoLAN","signerThumbprint":"ABC123","timestamped":true},"publisherMatch":"unverified","verifiedAt":"2026-11-11T10:00:00Z","installationEnabled":false}
+""";
+const string updateResultSample = """
+{"schemaVersion":1,"status":"succeeded","profile":"inno-machine","installerType":"inno","installerSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","hashMatched":true,"architecture":"x64","architectureCompatible":true,"signature":{"status":"Valid","signerSubject":"CN=VideoLAN, O=VideoLAN","signerThumbprint":"ABC123","timestamped":true},"exitCode":0,"rebootRequired":false,"reason":"Installer completed successfully.","startedAt":"2026-11-12T10:00:00Z","finishedAt":"2026-11-12T10:01:00Z"}
 """;
 var tests = new (string Name, Action Run)[]
 {
@@ -59,7 +62,7 @@ var tests = new (string Name, Action Run)[]
     }),
     ("Rejects missing update status", () => Reject(sample.Replace("\"isUpdateAvailable\":true,", ""))),
     ("Rejects contaminated JSON output", () => Reject("Warning: failed\n" + sample)),
-    ("Installer verification accepts structured evidence and keeps installation disabled", () =>
+    ("Installer verification accepts structured evidence without self-authorizing installation", () =>
     {
         Require(ValidVerification(verificationSample, updateSample));
         Require(ValidVerification(verificationSample
@@ -86,7 +89,9 @@ var tests = new (string Name, Action Run)[]
             updateSample.Replace("\"VideoLAN.VLC\"", "\"; whoami\""),
             updateSample.Replace("\"VideoLAN.VLC\"", "\"https://example.com\""),
             updateSample.Replace("\"machine\"", "\"unknown\""),
-            updateSample.Replace("\"exe\"", "\"\""),
+            updateSample.Replace("\"inno\"", "\"\""),
+            updateSample.Replace("\"inno-machine\"", "\"msi-machine\""),
+            updateSample.Replace("\"inno-machine\"", "\"exe-machine\""),
             updateSample.Replace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "not-a-hash"),
             updateSample.Replace("00000000-0000-4000-8000-000000000002", "not-a-guid")
         }) Require(!ValidUpdate(invalid));
@@ -96,6 +101,25 @@ var tests = new (string Name, Action Run)[]
         var trimmed = updateSample.TrimEnd();
         Require(!ValidUpdate(trimmed[..^1] + ",\"command\":\"winget upgrade\"}"));
         Require(!ValidUpdate(trimmed[..^1] + ",\"installerUrl\":\"https://example.com/file.exe\"}"));
+    }),
+    ("Executed update evidence requires matching identity, valid signature, compatible architecture, and exit code", () =>
+    {
+        Require(ValidUpdateResult(updateResultSample));
+        Require(ValidUpdateResult(updateResultSample.Replace("\"status\":\"succeeded\"", "\"status\":\"blocked\"")
+            .Replace("\"exitCode\":0", "\"exitCode\":null")
+            .Replace("\"hashMatched\":true", "\"hashMatched\":false")
+            .Replace("\"architectureCompatible\":true", "\"architectureCompatible\":false")
+            .Replace("\"status\":\"Valid\"", "\"status\":\"Unknown\"")));
+        foreach (var invalid in new[]
+        {
+            updateResultSample.Replace("\"profile\":\"inno-machine\"", "\"profile\":\"msi-machine\""),
+            updateResultSample.Replace("\"installerSha256\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"", "\"installerSha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\""),
+            updateResultSample.Replace("\"hashMatched\":true", "\"hashMatched\":false"),
+            updateResultSample.Replace("\"architectureCompatible\":true", "\"architectureCompatible\":false"),
+            updateResultSample.Replace("\"status\":\"Valid\"", "\"status\":\"NotTrusted\""),
+            updateResultSample.Replace("\"exitCode\":0", "\"exitCode\":null"),
+            updateResultSample.Replace("\"status\":\"succeeded\"", "\"status\":\"restart_required\"")
+        }) Require(!ValidUpdateResult(invalid));
     }),
     ("Preview installer selection parser accepts indented winget show fields", RunPreviewSelectionTest)
 };
@@ -112,6 +136,17 @@ static void Require(bool condition) { if (!condition) throw new Exception("Contr
 static bool ValidUpdate(string json)
 {
     try { using var document = JsonDocument.Parse(json); UpdateRunner.Validate(document.RootElement); return true; }
+    catch (Exception) { return false; }
+}
+static bool ValidUpdateResult(string result)
+{
+    try
+    {
+        using var resultDocument = JsonDocument.Parse(result);
+        using var requestDocument = JsonDocument.Parse(updateSample);
+        UpdateRunner.ValidateResult(resultDocument.RootElement, requestDocument.RootElement);
+        return true;
+    }
     catch (Exception) { return false; }
 }
 static bool ValidVerification(string result, string request)

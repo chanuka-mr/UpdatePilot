@@ -1,13 +1,15 @@
 'use client';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { RefreshCw, Database, Download, Grip } from 'lucide-react';
 import { AgentControls } from './agent-controls';
 import { AppIcon, Heading } from '../../components/ui/dashboard';
 
 type Dashboard = { state: 'ready'; deviceName: string; scannedAt: string; importedAt: string; stale: boolean;
+  agentStatus: string; lastSeenAt: string | null;
   wingetStatus: string; warningCount: number; registryEntries: number; wingetEntries: number | null;
   updatesAvailable: number | null; matched: number | null; unmatched: number | null;
-  updatePreview: { id: string; name: string; packageId: string; installedVersion: string | null }[] } | { state: 'empty' };
+  updatePreview: { id: string; name: string; packageId: string; installedVersion: string | null }[] } | { state: 'empty'; agentStatus?: string };
 export function LiveOverview() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState(''); const [loading, setLoading] = useState(true); const [refresh, setRefresh] = useState(0);
@@ -27,15 +29,15 @@ export function LiveOverview() {
     {error && <div role="alert" className="panel border border-red-100 p-6"><h2 className="font-semibold">Dashboard unavailable</h2><p className="mt-2 text-muted">{error}</p><button className="mt-4 text-primary underline" onClick={() => setRefresh(value => value + 1)}>Try again</button></div>}
     {!loading && data?.state === 'empty' && <section className="panel p-10 text-center"><Database className="mx-auto text-primary"/><h2 className="mt-4 text-lg font-semibold">No imported scans yet</h2><p className="mt-2 text-muted">Import an agent snapshot into the configured device, then refresh this page.</p></section>}
     {!loading && data?.state === 'ready' && <>
-      <section className="panel p-5"><h2 className="font-semibold">{data.deviceName}</h2><p className="mt-2 text-sm text-muted">Last imported scan: {new Date(data.scannedAt).toLocaleString()}</p><p className="mt-1 text-xs text-muted">Imported {new Date(data.importedAt).toLocaleString()} · Agent connection status is shown above</p>
+      <section className="panel p-5"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="font-semibold">{data.deviceName}</h2><span className={`rounded-full px-3 py-1 text-xs font-medium ${data.agentStatus === 'online' ? 'bg-green-50 text-green-700' : data.agentStatus === 'offline' ? 'bg-amber-50 text-amber-800' : 'bg-inset text-muted'}`}>Agent {data.agentStatus === 'online' ? 'online' : data.agentStatus === 'offline' ? 'offline' : data.agentStatus === 'unpaired' ? 'not paired' : 'status unknown'}</span></div><p className="mt-2 text-sm text-muted">Last imported scan: {new Date(data.scannedAt).toLocaleString()}</p><p className="mt-1 text-xs text-muted">Imported {new Date(data.importedAt).toLocaleString()}{data.lastSeenAt ? ` | Agent last seen ${new Date(data.lastSeenAt).toLocaleString()}` : ''} · Agent connection status is shown above</p>
         {(data.stale || data.warningCount > 0 || data.wingetStatus !== 'completed') && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">{data.stale ? 'Scan is over 24 hours old. ' : ''}{data.warningCount > 0 ? `${data.warningCount} scan warning(s). ` : ''}{data.wingetStatus !== 'completed' ? 'WinGet scan was not completed; update counts are unknown.' : ''}</p>}
       </section>
       <div className="grid gap-4 sm:grid-cols-3">{[['Desktop registry entries', data.registryEntries, Grip], ['Updates available', data.updatesAvailable, Download], ['WinGet inventory entries', data.wingetEntries, Database]].map(([label,count,Icon]) => {const I=Icon as typeof Grip;return <section className="panel p-6" key={String(label)}><div className="flex justify-between gap-2"><h2 className="metric-label">{String(label)}</h2><I size={23} className="text-primary"/></div><p className="metric-number">{count === null ? 'Unknown' : String(count)}</p></section>;})}</div>
       <p className="text-xs text-muted">Registry and WinGet entries cover different sets and are not added together. Catalog matched: {data.matched ?? 'unknown'} · Unmatched: {data.unmatched ?? 'unknown'}. Unmatched entries are not classified as up to date.</p>
       <section className="panel overflow-hidden"><div className="p-6"><h2 className="text-xl font-semibold">Available Updates</h2><p className="mt-2 text-xs text-muted">First five matched update candidates from the stored scan. Installation targets still require a separate verified preview.</p></div>
-        {data.updatePreview.length ? <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>Application</th><th>Package ID</th><th>Installed version</th><th>Status</th></tr></thead><tbody>{data.updatePreview.map(app => <tr key={app.id}><td><div className="flex items-center gap-3"><AppIcon name={app.name}/><strong>{app.name}</strong></div></td><td className="font-mono text-xs text-muted">{app.packageId}</td><td><span className="version">{app.installedVersion || 'Unknown'}</span></td><td className="whitespace-nowrap text-xs text-primary">Update available</td></tr>)}</tbody></table></div> : <p className="px-6 pb-6 text-muted">{data.wingetStatus === 'completed' ? 'No matched update candidates in this scan.' : 'Update information is unavailable for this scan.'}</p>}
+        {data.updatePreview.length ? <div className="overflow-x-auto"><table className="w-full"><thead><tr><th>Application</th><th>Package ID</th><th>Installed version</th><th>Status</th></tr></thead><tbody>{data.updatePreview.map(app => <tr key={app.id}><td><div className="flex items-center gap-3"><AppIcon name={app.name}/><Link href={`/updates/${app.id}`} className="font-semibold hover:text-primary">{app.name}</Link></div></td><td className="font-mono text-xs text-muted">{app.packageId}</td><td><span className="version">{app.installedVersion || 'Unknown'}</span></td><td className="whitespace-nowrap text-xs text-primary">Update available</td></tr>)}</tbody></table></div> : <p className="px-6 pb-6 text-muted">{data.wingetStatus === 'completed' ? 'No matched update candidates in this scan.' : 'Update information is unavailable for this scan.'}</p>}
       </section>
-      <p className="text-xs text-muted">Refresh reloads PostgreSQL data; it does not start an agent scan. Application and update lists use stored scan data. History shows imported scans. Standalone update-review screens remain labelled demos.</p>
+      <p className="text-xs text-muted">Refresh reloads PostgreSQL data; it does not start an agent scan. Application and update lists use stored scan data. History shows imported scans. Application and update details use stored scan records.</p>
     </>}
   </>;
 }

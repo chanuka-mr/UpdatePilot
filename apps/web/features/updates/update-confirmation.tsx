@@ -1,11 +1,13 @@
 'use client';
 import Link from 'next/link';
+import {useRouter} from 'next/navigation';
 import {useEffect,useState} from 'react';
 import {ArrowRight,ShieldAlert,ShieldCheck} from 'lucide-react';
 import {AppIcon,Badge,Heading} from '../../components/ui/dashboard';
 import {readStoredPreview,readStoredVerification,storeVerification,type InstallerVerification,type UpdatePreviewData} from './preview-data';
 
 export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}){
+  const router=useRouter();
   const [preview,setPreview]=useState<UpdatePreviewData|null>(null);
   const [displayName,setDisplayName]=useState(name);
   const [phase,setPhase]=useState('Checking stored preview');
@@ -14,6 +16,8 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
   const [loading,setLoading]=useState(false);
   const [acknowledged,setAcknowledged]=useState(false);
   const [confirmed,setConfirmed]=useState(false);
+  const [starting,setStarting]=useState(false);
+  const [startError,setStartError]=useState('');
   const [verification,setVerification]=useState<InstallerVerification|null>(null);
   const [verifyJob,setVerifyJob]=useState<string|null>(null);
   const [verifyPreviewCheckedAt,setVerifyPreviewCheckedAt]=useState('');
@@ -22,7 +26,7 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
   const [verifying,setVerifying]=useState(false);
 
   useEffect(()=>{
-    setConfirmed(false);setAcknowledged(false);setError('');
+    setConfirmed(false);setAcknowledged(false);setError('');setStarting(false);setStartError('');
     setVerification(null);setVerifyJob(null);setVerifyPreviewCheckedAt('');setVerifyPhase('');setVerifyError('');setVerifying(false);
     const stored=readStoredPreview(recordId);
     if(stored){
@@ -115,15 +119,32 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
     }catch(e){setVerifyError(e instanceof Error?e.message:'Verification unavailable.');setVerifying(false);}
   }
 
+  async function startUpdate(){
+    if(!preview||!verification)return;
+    setStarting(true);setStartError('');
+    try{
+      const res=await fetch('/api/agent/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recordId})});
+      const body=await res.json();
+      if(!res.ok){
+        const blockers=Array.isArray(body.details?.blockers)?` Blockers: ${body.details.blockers.join(', ')}.`:'';
+        throw new Error(`${body.error||'Cannot start the verified update.'}${blockers}`);
+      }
+      if(typeof body.executionId!=='string')throw new Error('The backend did not return an update execution.');
+      setConfirmed(true);
+      router.push(`/updates/executions/${encodeURIComponent(body.executionId)}`);
+    }catch(e){setStartError(e instanceof Error?e.message:'Cannot start the verified update.');setStarting(false);}
+  }
+
   const identityReady=!!preview&&preview.selectionValidated&&!!preview.targetVersion&&!!preview.installerType&&!!preview.installerSha256;
-  const canConfirm=identityReady&&acknowledged&&!confirmed;
+  const verificationReady=!!verification&&verification.signature.status==='Valid'&&verification.architectureCompatible&&verification.hashMatched;
+  const canConfirm=identityReady&&verificationReady&&acknowledged&&!confirmed&&!starting;
   const executionBlockers=preview?[
     preview.selectionValidated?null:'Current-device selection was not validated',
     preview.scope==='user'||preview.scope==='machine'?null:'Installation scope is unknown',
     verification?(verification.architecture==='unknown'?'Installer architecture is unknown':verification.architectureCompatible?'':`Installer architecture ${verification.architecture} is not compatible with this device`):'Installer architecture is not verified',
     verification?(verification.signature.status==='Valid'?null:`Installer signature is ${verification.signature.status}`):'Installer signature is not verified',
     verification?(verification.hashMatched?'':'Installer file hash did not match the preview'):'Installer file and hash are not verified',
-    'Update execution is disabled in this build',
+    'Backend execution must be explicitly enabled with UPDATE_EXECUTION_ENABLED=true',
   ].filter((value):value is string=>!!value):[];
 
   return <><Link href="/updates" className="text-xs text-muted">← Updates / Confirm Update</Link>
@@ -137,7 +158,7 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
             <p className="mt-1 break-all text-xs text-muted">{preview?.packageId||'Resolving package identity'}</p>
           </div>
         </div>
-        <Badge>{confirmed?'Confirmed for review':identityReady?'Ready to confirm':'Awaiting verified preview'}</Badge>
+        <Badge>{confirmed?'Update queued':identityReady&&verificationReady?'Ready to start':'Awaiting verified preview'}</Badge>
       </div>
       {!preview&&!error&&!loading&&<div className="p-6"><p role="status" className="text-muted">{attempt===0?'No stored preview for this update. Request a read-only preview to continue.':phase}</p><button className="primary-button mt-4" onClick={()=>setAttempt(value=>value+1)}>Request preview</button></div>}
       {!preview&&!error&&loading&&<p role="status" className="p-6 text-muted">{phase} · Keep the paired agent running. This reads package metadata without downloading or installing an application.</p>}
@@ -165,7 +186,7 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
       {verification&&<dl className="mt-5 grid gap-4 rounded-lg border border-slate-200 p-5 sm:grid-cols-2">
         {[['Architecture',verification.architecture],['Architecture compatibility',verification.architectureCompatible?'Compatible':'Not compatible'],['SHA-256 match',verification.hashMatched?'Matched':'Not matched'],['Signature status',verification.signature.status],['Signer',verification.signature.signerSubject||'Not available'],['Signer thumbprint',verification.signature.signerThumbprint||'Not available'],['Timestamped',verification.signature.timestamped?'Yes':'No'],['Publisher match',verification.publisherMatch],['Verified at',new Date(verification.verifiedAt).toLocaleString()]].map(([label,value])=><div key={label}><dt className="text-xs text-muted">{label}</dt><dd className="mt-1 break-all font-medium">{value}</dd></div>)}
       </dl>}
-      <p className="mt-4 rounded-lg bg-inset p-3 text-xs leading-5 text-muted">Verification evidence is reported by the paired agent and re-bound by the backend to this preview. Publisher matching is recorded for review and is not yet a hard gate. Installation remains disabled.</p>
+      <p className="mt-4 rounded-lg bg-inset p-3 text-xs leading-5 text-muted">Verification evidence is reported by the paired agent and re-bound by the backend to this preview. Publisher matching is recorded for review and is not yet a hard gate. A valid signature, matching hash, and compatible architecture are required before the execution gate can open.</p>
     </section>}
     {preview&&<section className="panel p-6">
       <h2 className="flex items-center gap-2 text-lg font-semibold"><ShieldAlert size={20} className="text-amber-600"/>Warnings and limitations</h2>
@@ -178,7 +199,7 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
     </section>}
     {preview&&<section className="panel p-6">
       <h2 className="flex items-center gap-2 text-lg font-semibold"><ShieldAlert size={20} className="text-amber-600"/>Execution safety gate</h2>
-      <p className="mt-2 text-sm text-muted">The controlled update workflow is hard-blocked until every check passes. Confirm for review does not queue an update job or run an installer; verification only downloads to a temporary folder.</p>
+      <p className="mt-2 text-sm text-muted">The controlled update workflow is hard-blocked until every check passes. Starting an update requires the backend execution flag, a fresh preview, and passing verification evidence. The agent re-downloads and rechecks the installer before launch.</p>
       <ul className="mt-4 space-y-2 text-sm">{executionBlockers.map(blocker=><li key={blocker} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-amber-900"><ShieldAlert size={16} className="mt-0.5 shrink-0"/>{blocker}</li>)}</ul>
       <p className="mt-4 rounded-lg bg-inset p-3 text-xs leading-5 text-muted">{preview.scope==='machine'?'Machine-scope upgrades typically require administrator elevation and may show a UAC prompt.':preview.scope==='user'?'Current-user scope may not require elevation, but WinGet can still prompt.':'Elevation requirements cannot be determined while the installation scope is unknown.'}</p>
     </section>}
@@ -186,9 +207,11 @@ export function UpdateConfirmation({recordId,name}:{recordId:string;name:string}
       <h2 className="text-lg font-semibold">Explicit confirmation</h2>
       {!preview&&<p className="mt-2 text-sm text-muted">Confirmation becomes available after the agent resolves installer identity.</p>}
       {preview&&!identityReady&&<p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Confirmation is blocked because the target version, installer type, SHA-256, or current-device selection is not verified. Request a fresh scan and preview.</p>}
-      <label className={`mt-4 flex items-start gap-3 text-sm ${!identityReady?'opacity-60':''}`}><input type="checkbox" className="mt-1 size-4 accent-blue-600" checked={acknowledged} disabled={!identityReady||confirmed} onChange={e=>setAcknowledged(e.target.checked)}/><span>I have reviewed the target version, installer type, SHA-256, scope, and warnings above, and I confirm this update for review.</span></label>
-      <div className="mt-5 flex flex-wrap justify-end gap-3"><Link href="/updates" className="rounded-lg bg-white px-4 py-2 text-muted">Cancel</Link><button className="primary-button" disabled={!canConfirm} onClick={()=>setConfirmed(true)}><ShieldCheck size={17}/>{confirmed?'Confirmed':'Confirm for review'}</button></div>
-      {confirmed&&<div role="status" className="mt-5 rounded-lg bg-green-50 p-4 text-sm leading-6 text-green-800"><strong>Confirmed for review.</strong> No update job was queued and no system changes were made. Verification downloads to a temporary folder only; it never executes the installer.</div>}
+      <label className={`mt-4 flex items-start gap-3 text-sm ${!identityReady?'opacity-60':''}`}><input type="checkbox" className="mt-1 size-4 accent-blue-600" checked={acknowledged} disabled={!identityReady||confirmed||starting} onChange={e=>setAcknowledged(e.target.checked)}/><span>I have reviewed the target version, installer type, SHA-256, scope, verification evidence, and warnings above, and I confirm this exact update.</span></label>
+      <div className="mt-5 flex flex-wrap justify-end gap-3"><Link href="/updates" className="rounded-lg bg-white px-4 py-2 text-muted">Cancel</Link><button className="primary-button" disabled={!canConfirm} onClick={()=>void startUpdate()}><ShieldCheck size={17}/>{starting?'Starting verified update...':confirmed?'Update queued':'Confirm and start update'}</button></div>
+      {!verificationReady&&identityReady&&<p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Run installer verification successfully before starting this update.</p>}
+      {startError&&<div role="alert" className="mt-5 rounded-lg bg-red-50 p-4 text-sm leading-6 text-red-700">{startError}</div>}
+      {confirmed&&<div role="status" className="mt-5 rounded-lg bg-green-50 p-4 text-sm leading-6 text-green-800"><strong>Update queued.</strong> Follow the execution page for live agent progress. No installer is launched until the agent re-verifies the downloaded file.</div>}
     </section>
   </>;
 }

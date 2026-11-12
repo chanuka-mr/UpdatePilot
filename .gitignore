@@ -157,6 +157,10 @@ examples/
 agent/**/bin/
 agent/**/obj/
 agent/**/data/
+apps/windows-agent/**/bin/
+apps/windows-agent/**/obj/
+apps/windows-agent/**/data/
 
 # Generated Prisma client
 backend/generated/
+apps/api/generated/
