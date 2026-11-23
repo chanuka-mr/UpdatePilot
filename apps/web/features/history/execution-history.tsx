@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowRight, RefreshCw } from 'lucide-react';
 import { AppIcon, Badge, SearchField } from '../../components/ui/dashboard';
+import { executionStatus } from '../../lib/status';
 
 type Execution = { id: string; name: string; packageId: string; installedVersion: string; targetVersion: string;
   status: string; stage: string; progress: number; message: string | null; error: string | null;
@@ -40,7 +41,7 @@ export function ExecutionHistory() {
       <SearchField placeholder="Search app or package ID" value={q} onChange={value => { setQ(value); setPage(1); }}/>
       <select aria-label="Update execution status" value={status} onChange={event => { setStatus(event.target.value); setPage(1); }} className="rounded-lg border border-slate-200 bg-white p-2">
         <option value="all">All execution states</option>
-        {['queued','running','confirming','awaiting_restart','succeeded','verification_failed','failed','blocked','cancelled','interrupted'].map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}
+        {['queued','running','confirming','awaiting_restart','succeeded','verification_failed','failed','blocked','cancelled','interrupted'].map(value => <option key={value} value={value}>{executionStatus(value).label}</option>)}
       </select>
     </div>
     {loading && !data ? <p role="status" className="p-8 text-center text-muted">Loading update activity...</p>
@@ -49,7 +50,7 @@ export function ExecutionHistory() {
           : data && <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Application','Version','State','Queued','Action'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{data.rows.map(row => <tr key={row.id}>
             <td><div className="flex items-center gap-3"><AppIcon name={row.name}/><div><p className="font-semibold">{row.name}</p><p className="mt-1 break-all text-[11px] text-muted">{row.packageId}</p></div></div></td>
             <td className="whitespace-nowrap font-mono text-xs">{row.installedVersion}<ArrowRight className="mx-1 inline" size={12}/>{row.targetVersion}</td>
-            <td><Badge>{row.status.replaceAll('_',' ')}</Badge><p className="mt-2 text-xs text-muted">{row.stage.replaceAll('_',' ')} - {row.progress}%</p>{row.error && <p className="mt-1 max-w-xs text-xs text-red-700">{row.error}</p>}</td>
+            <td><Badge tone={executionStatus(row.status).tone}>{executionStatus(row.status).label}</Badge><p className="mt-2 text-xs text-muted">{row.stage.replaceAll('_',' ')}</p>{row.error && <p className="mt-1 max-w-xs text-xs text-red-700">{row.error}</p>}</td>
             <td className="whitespace-nowrap text-xs">{new Date(row.createdAt).toLocaleString()}</td>
             <td><Link className="text-xs font-medium text-primary hover:underline" href={`/updates/executions/${encodeURIComponent(row.id)}`}>Open</Link></td>
           </tr>)}</tbody></table></div>}

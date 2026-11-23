@@ -1,7 +1,13 @@
 import { Globe, Grip, Search } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { inferTone, type StatusTone } from '../../lib/status';
+
+const badgeClasses: Record<StatusTone, string> = {
+  neutral: 'bg-inset text-muted', info: 'bg-primary-soft text-primary', success: 'bg-green-50 text-green-700',
+  warning: 'bg-amber-50 text-amber-700', danger: 'bg-red-50 text-red-700',
+};
 export function Heading({title,description,action}:{title:string;description:string;action?:ReactNode}) {return <div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-semibold tracking-tight">{title}</h1><p className="mt-2 text-muted">{description}</p></div>{action}</div>;}
-export function Badge({children}:{children:ReactNode}) {const text=String(children);return <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${/Failed|Interrupted/.test(text)?'bg-red-50 text-red-700':/Completed|Up to Date/.test(text)?'bg-green-50 text-green-700':/Unknown|Restart/.test(text)?'bg-amber-50 text-amber-700':/Unsupported/.test(text)?'bg-inset text-muted':'bg-primary-soft text-primary'}`}>{children}</span>;}
+export function Badge({children,tone}:{children:ReactNode;tone?:StatusTone}) {return <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${badgeClasses[tone ?? inferTone(String(children))]}`}>{children}</span>;}
 export function AppIcon({name}:{name:string}) {return <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-inset text-primary">{name.includes('Chrome')||name.includes('Firefox')?<Globe size={22}/>:<Grip size={22}/>}</span>;}
 export function SearchField({value,onChange,placeholder='Search applications...'}:{value:string;onChange:(value:string)=>void;placeholder?:string}) {return <label className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5"><Search size={17} className="text-muted"/><input aria-label={placeholder} placeholder={placeholder} value={value} onChange={event=>onChange(event.target.value)} className="min-w-0 w-full bg-transparent outline-none"/></label>;}
 export function Empty({reset}:{reset:()=>void}) {return <div className="p-16 text-center"><Search className="mx-auto mb-4 text-muted"/><h3 className="font-semibold">No matching results</h3><p className="mt-2 text-muted">Try adjusting your search or filters.</p><button onClick={reset} className="mt-4 text-primary underline">Reset filters</button></div>;}

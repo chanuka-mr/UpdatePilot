@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { PrismaClient } from '../../../generated/prisma/client.js';
-import { record } from '../agent/update.js';
+import { deriveExecutionProfile, evaluateUpdateGate, record, type UpdateBlocker } from '../agent/update.js';
+import { isOnline } from '../agent/api.js';
 
 const idSchema = z.uuid();
 
@@ -37,6 +38,34 @@ async function evidence(db: PrismaClient, deviceId: string, packageId: string, p
   };
 }
 
+type Candidate = { id: string; packageId: string; installedVersion: string | null; source: string | null; isUpdateAvailable: boolean; matchStatus: string };
+
+async function executionReadiness(db: PrismaClient, deviceId: string, snapshot: NonNullable<Awaited<ReturnType<typeof findSnapshot>>>, candidate: Candidate, jobEvidence: Awaited<ReturnType<typeof evidence>>) {
+  const [agent, active] = await Promise.all([
+    db.agentCredential.findFirst({ where: { deviceId, revokedAt: null }, orderBy: { createdAt: 'desc' }, select: { lastSeenAt: true, revokedAt: true } }),
+    db.scanJob.findFirst({ where: { deviceId, state: { in: ['queued', 'running'] } }, select: { id: true } }),
+  ]);
+  const executionEnabled = process.env.UPDATE_EXECUTION_ENABLED === 'true';
+  const agentOnline = !!agent && isOnline(agent.lastSeenAt, agent.revokedAt);
+  const gate = evaluateUpdateGate({
+    executionEnabled, agentOnline, activeJob: !!active,
+    snapshot: { id: snapshot.id, scannedAt: snapshot.scannedAt, wingetStatus: snapshot.wingetStatus },
+    candidate: { ...candidate, installedVersion: candidate.installedVersion ?? '' },
+    previewJob: jobEvidence.preview ? { id: jobEvidence.preview.id, state: jobEvidence.preview.state, createdAt: jobEvidence.preview.createdAt,
+      request: jobEvidence.preview.request, preview: jobEvidence.preview.preview } : null,
+    verificationJob: jobEvidence.verification ? { id: jobEvidence.verification.id, state: jobEvidence.verification.state, createdAt: jobEvidence.verification.createdAt,
+      request: jobEvidence.verification.request, verification: jobEvidence.verification.verification } : null,
+  });
+  const preview = record(jobEvidence.preview?.preview);
+  const scope = preview?.scope;
+  const installerType = typeof preview?.installerType === 'string' ? preview.installerType : null;
+  const profile = installerType && (scope === 'user' || scope === 'machine') ? deriveExecutionProfile(installerType, scope) : null;
+  const blockers: UpdateBlocker[] = gate.ok ? [] : gate.blockers;
+  return { state: gate.ok ? 'ready' as const : 'blocked' as const, canStart: gate.ok, blockers,
+    executionEnabled, agentOnline, activeJob: !!active, profile,
+    previewAvailable: !!jobEvidence.preview, verificationAvailable: !!jobEvidence.verification };
+}
+
 export async function readApplicationDetail(db: PrismaClient, deviceKey: string, id: string, snapshotId?: string) {
   const applicationId = idSchema.parse(id);
   const selectedSnapshotId = snapshotId ? idSchema.parse(snapshotId) : undefined;
@@ -62,7 +91,10 @@ export async function readUpdateDetail(db: PrismaClient, deviceKey: string, id: 
   if (!snapshot) return { state: 'empty' };
   const pkg = await db.winGetPackage.findFirst({ where: { id: applicationId, snapshotId: snapshot.id } });
   if (!pkg) return { state: 'not-found', snapshot: snapshotMeta(snapshot) };
+  const status = packageStatus(pkg);
+  const jobEvidence = await evidence(db, snapshot.deviceId, pkg.packageId);
   return { state: 'ready', kind: 'winget', snapshot: snapshotMeta(snapshot),
-    record: { ...pkg, status: packageStatus(pkg) },
-    evidence: await evidence(db, snapshot.deviceId, pkg.packageId) };
+    record: { ...pkg, status },
+    evidence: jobEvidence,
+    execution: status === 'update' ? await executionReadiness(db, snapshot.deviceId, snapshot, pkg, jobEvidence) : null };
 }

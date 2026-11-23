@@ -53,13 +53,14 @@ export async function control(db:PrismaClient,key:string,action:string,method:st
   // Pairing is the secure bootstrap path for a newly installed backend. A scan
   // cannot create the first device because scans are agent-authenticated.
   if(!device&&action==='pairing'&&method==='POST')device=await db.device.create({data:{key,name:'Local Windows PC'}});
-  if(!device&&action==='status'&&method==='GET')return {paired:false,online:false,lastSeenAt:null,job:null};
+  if(!device&&action==='status'&&method==='GET')return {paired:false,online:false,lastSeenAt:null,job:null,activeJob:false,executionEnabled:process.env.UPDATE_EXECUTION_ENABLED==='true',deviceName:'Local Windows PC'};
   if(!device)throw new ApiError(409,'Generate a pairing code before requesting agent work.');
   await expire(db,device.id);
   if(action==='status'&&method==='GET') {
     const agent=await db.agentCredential.findFirst({where:{deviceId:device.id,revokedAt:null},orderBy:{createdAt:'desc'}});
     const job=await db.scanJob.findFirst({where:{deviceId:device.id},orderBy:{createdAt:'desc'},select:{id:true,state:true,operation:true,request:true,preview:true,verification:true,progress:true,updateExecutionId:true,createdAt:true,startedAt:true,finishedAt:true,error:true,snapshotId:true}});
-    return {paired:!!agent,online:agent?isOnline(agent.lastSeenAt,agent.revokedAt):false,lastSeenAt:agent?.lastSeenAt??null,job};
+    return {paired:!!agent,online:agent?isOnline(agent.lastSeenAt,agent.revokedAt):false,lastSeenAt:agent?.lastSeenAt??null,job,
+      activeJob:!!job&&['queued','running'].includes(job.state),executionEnabled:process.env.UPDATE_EXECUTION_ENABLED==='true',deviceName:device.name};
   }
   if(action==='pairing'&&method==='POST') {
     const code=randomBytes(24).toString('hex');const expiresAt=new Date(Date.now()+5*60000);
