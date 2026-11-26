@@ -15,7 +15,7 @@ test('executed update evidence requires a matching hash, valid signature, archit
   assert.equal(updateExecutionResultSchema.safeParse(result).success, true);
   for (const invalid of [
     { ...result, command: 'winget upgrade' },
-    { ...result, profile: 'exe-machine' },
+    { ...result, profile: 'zip-machine' },
     { ...result, installerSha256: 'bad' },
     { ...result, hashMatched: false },
     { ...result, architectureCompatible: false },

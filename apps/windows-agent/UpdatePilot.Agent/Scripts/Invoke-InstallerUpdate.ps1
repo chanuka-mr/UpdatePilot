@@ -81,6 +81,7 @@ try {
         'nullsoft' { 'nsis' }
         'nsis' { 'nsis' }
         'burn' { 'burn' }
+        'exe' { 'exe' }
         default { $null }
     }
     $expectedProfile=if ($family) {"$family-$($request.scope)"} else {$null}
@@ -116,6 +117,7 @@ try {
         $result.hashMatched=$true
         if ($family -eq 'msi' -and $installer.Extension -ne '.msi') { throw 'Downloaded installer type does not match the allowlisted MSI profile.' }
         if ($family -ne 'msi' -and $installer.Extension -eq '.msi') { throw 'Downloaded installer type does not match the allowlisted executable profile.' }
+        if ($family -eq 'exe' -and $installer.Extension -ne '.exe') { throw 'Downloaded installer type does not match the allowlisted EXE profile.' }
 
         $signature=Get-AuthenticodeSignature -LiteralPath $installer.FullName
         $signatureStatus=switch ([string]$signature.Status) {
@@ -153,6 +155,8 @@ try {
             } elseif ($family -eq 'inno') {
                 & $installer.FullName /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
             } elseif ($family -eq 'nsis') {
+                & $installer.FullName /S
+            } elseif ($family -eq 'exe') {
                 & $installer.FullName /S
             } else {
                 & $installer.FullName /quiet /norestart

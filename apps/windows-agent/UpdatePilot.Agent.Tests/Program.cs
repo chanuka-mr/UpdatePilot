@@ -91,7 +91,7 @@ var tests = new (string Name, Action Run)[]
             updateSample.Replace("\"machine\"", "\"unknown\""),
             updateSample.Replace("\"inno\"", "\"\""),
             updateSample.Replace("\"inno-machine\"", "\"msi-machine\""),
-            updateSample.Replace("\"inno-machine\"", "\"exe-machine\""),
+            updateSample.Replace("\"inno-machine\"", "\"zip-machine\""),
             updateSample.Replace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "not-a-hash"),
             updateSample.Replace("00000000-0000-4000-8000-000000000002", "not-a-guid")
         }) Require(!ValidUpdate(invalid));

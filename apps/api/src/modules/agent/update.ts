@@ -7,6 +7,7 @@ export const executionProfiles = [
   'inno-user', 'inno-machine',
   'nsis-user', 'nsis-machine',
   'burn-user', 'burn-machine',
+  'exe-user', 'exe-machine',
 ] as const;
 export type ExecutionProfile = typeof executionProfiles[number];
 
@@ -16,7 +17,8 @@ export function deriveExecutionProfile(installerType: string, scope: 'user' | 'm
     : family === 'inno' ? 'inno'
       : family === 'nullsoft' || family === 'nsis' ? 'nsis'
         : family === 'burn' ? 'burn'
-          : null;
+          : family === 'exe' ? 'exe'
+            : null;
   return profile ? `${profile}-${scope}` as ExecutionProfile : null;
 }
 

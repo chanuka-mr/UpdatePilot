@@ -72,14 +72,14 @@ test('update requests reject extra properties and invalid installer evidence', (
     { ...request, packageId: '; whoami' },
     { ...request, installerSha256: 'not-a-hash' },
     { ...request, scope: 'unknown' },
-    { ...request, profile: 'exe-machine' },
+    { ...request, profile: 'zip-machine' },
   ]) assert.equal(updateRequestSchema.safeParse(bad).success, false);
   const { profile: _profile, ...withoutProfile } = request;
   assert.equal(updateRequestSchema.safeParse(withoutProfile).success, false);
 });
 
 test('update gate blocks installers without an allowlisted execution profile', () => {
-  assert.ok(blockers({ ...base, previewJob: { ...previewJob, preview: { ...preview, installerType: 'exe' } } }).includes('execution_profile_unavailable'));
+  assert.ok(blockers({ ...base, previewJob: { ...previewJob, preview: { ...preview, installerType: 'zip' } } }).includes('execution_profile_unavailable'));
 });
 
 test('update execution stays disabled until the server flag is enabled', () => {
