@@ -13,6 +13,7 @@
     "db:import": "tsx src/cli/index.ts import",
     "db:summary": "tsx src/cli/index.ts summary",
     "db:studio": "prisma studio",
+    "user:create": "tsx src/cli/index.ts user:create",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
     "dev": "tsx watch src/server.ts",

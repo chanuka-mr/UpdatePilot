@@ -2,23 +2,45 @@
 
 The .NET 10 Windows agent performs read-only inventory scans, resolves update metadata, verifies installers, and executes approved updates requested by the local UpdatePilot backend.
 
-## Pair and listen
+## Install, pair, start, and stop
 
-Start the backend and frontend, open **Settings**, and generate a pairing code. Then from this directory in **Command Prompt**:
+1. Set the hosted API endpoint (HTTPS required in production; no inbound port or router forwarding is needed because the agent initiates outbound connections):
 
-```cmd
-"C:\Program Files\dotnet\dotnet.exe" run --project .\UpdatePilot.Agent -- --pair
+```powershell
+$env:UPDATEPILOT_API_URL = "https://your-api-host.example"
+$env:UPDATEPILOT_ALLOWED_HOST = "your-api-host.example"
 ```
 
-Enter the short-lived code at the prompt. Start the listener in a terminal that stays open:
+   *(For local development against `http://127.0.0.1:4010`, also set `$env:UPDATEPILOT_ALLOW_LOCALHOST = "true"`.)*
 
-```cmd
-"C:\Program Files\dotnet\dotnet.exe" run --project .\UpdatePilot.Agent -- --listen
+2. Open **Settings** on the UpdatePilot website and generate a single-use pairing code (valid for 5 minutes).
+3. Pair the Windows user account:
+
+```powershell
+dotnet run --project .\UpdatePilot.Agent -- --pair
 ```
 
-Keep the listener open during scans, previews, verification, and updates. Credentials and pending envelopes are DPAPI-protected under `%LOCALAPPDATA%\UpdatePilot`; do not share that directory. Only one listener may use a state directory at a time.
+   Or with the published executable:
 
-For nondefault local ports, set `UPDATEPILOT_API_URL` before pairing/listening. Only HTTP loopback addresses are supported. Heartbeats are sent roughly every 10 seconds. Revoke the agent from Settings to invalidate its credential and interrupt queued/running jobs.
+```powershell
+.\UpdatePilot.Agent.exe --pair
+```
+
+4. Start the listener (keep the terminal open; press `Ctrl+C` to stop):
+
+```powershell
+.\UpdatePilot.Agent.exe --listen
+```
+
+Credentials and pending envelopes are DPAPI-protected under `%LOCALAPPDATA%\UpdatePilot`; do not share that directory. Only one listener may use a state directory at a time. Heartbeats are sent roughly every 10 seconds. Revoke the agent from Settings to invalidate its credential and interrupt queued/running jobs.
+
+## Packaging and signing (before public release)
+
+```powershell
+dotnet publish .\UpdatePilot.Agent\UpdatePilot.Agent.csproj -c Release -r win-x64 --self-contained true -o .\dist\win-x64
+```
+
+Sign `UpdatePilot.Agent.exe` (and any MSI/installer wrapper) with your Authenticode code-signing certificate using `signtool.exe` before distributing publicly.
 
 ## Fixed operations
 

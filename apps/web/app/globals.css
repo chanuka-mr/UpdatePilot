@@ -38,4 +38,21 @@ tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: #f7f9fb; }
 dialog { border: 0; padding: 24px; border-radius: 14px; color: #191c1e; background: white; width: min(512px, calc(100% - 32px)); margin: auto; box-shadow: 0 20px 40px #0f172a26; }
 dialog::backdrop { background: #191c1e66; backdrop-filter: blur(2px); }
+@keyframes progress-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.progress-fill {
+  position: relative;
+  overflow: hidden;
+  transition: width 650ms cubic-bezier(0.22, 1, 0.36, 1), background-color 300ms ease;
+}
+.progress-fill.is-active::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 55%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  animation: progress-shimmer 1.6s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

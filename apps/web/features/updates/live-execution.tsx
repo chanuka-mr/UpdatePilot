@@ -67,6 +67,12 @@ export function LiveExecution({ id }: { id: string }) {
   const [acting, setActing] = useState('');
   const [actionError, setActionError] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const ticker = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(ticker);
+  }, []);
 
   useEffect(() => {
     let stopped = false;
@@ -78,7 +84,7 @@ export function LiveExecution({ id }: { id: string }) {
         if (!response.ok) throw new Error(body.error || 'Update execution unavailable.');
         if (stopped) return;
         setData(body); setError(''); setLastUpdated(new Date());
-        if (body.execution && active.has(body.execution.status)) timer = setTimeout(() => void load(), 3000);
+        if (body.execution && active.has(body.execution.status)) timer = setTimeout(() => void load(), 1000);
       } catch (failure) { if (!stopped) setError(failure instanceof Error ? failure.message : 'Update execution unavailable.'); }
       finally { if (!stopped) setLoading(false); }
     };
@@ -122,7 +128,7 @@ export function LiveExecution({ id }: { id: string }) {
       <section className="panel overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 p-6">
           <div className="flex items-center gap-3"><AppIcon name={execution.name} /><div><h2 className="text-xl font-semibold">{execution.name}</h2><p className="mt-1 text-sm text-muted">{execution.installedVersion} <ArrowRight size={14} className="inline" /> <span className="text-primary">{execution.targetVersion}</span></p></div></div>
-          <div className="flex flex-wrap items-center gap-3"><Badge tone={status.tone}>{status.label}</Badge>{lastUpdated && <span className="text-xs text-muted">Updated {lastUpdated.toLocaleTimeString()}</span>}</div>
+          <div className="flex flex-wrap items-center gap-3"><Badge tone={status.tone}>{status.label}</Badge>{execution && active.has(execution.status) && <span className="text-xs text-muted">Elapsed {Math.max(0, Math.floor((nowMs - new Date(execution.createdAt).getTime()) / 1000))}s</span>}{lastUpdated && <span className="text-xs text-muted">Updated {lastUpdated.toLocaleTimeString()}</span>}</div>
         </div>
         <div className="p-6">
           <p className="text-sm text-muted">Step {step + 1} of {steps.length}: <span className="font-medium text-foreground">{stageText || steps[step]}</span></p>
@@ -139,7 +145,7 @@ export function LiveExecution({ id }: { id: string }) {
                   <span className={`text-xs font-semibold ${done ? 'text-green-800' : current ? failed ? 'text-red-800' : 'text-primary' : 'text-muted'}`}>{label}</span>
                 </div>
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label={`${label} progress`} aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
-                  <div className={`h-full transition-all ${bar}`} style={{ width: `${percent}%` }} />
+                  <div className={`progress-fill h-full rounded-full ${current && !failed ? 'is-active' : ''} ${bar}`} style={{ width: `${percent}%` }} />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-[11px] text-muted"><span>{percent}%</span><span>{done ? 'Complete' : current ? failed ? 'Needs attention' : 'In progress' : 'Waiting'}</span></div>
               </li>;

@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAgentStatus } from '../../components/providers/agent-status-provider';
 
-const setupCommands = `"C:\\Program Files\\dotnet\\dotnet.exe" run --project .\\UpdatePilot.Agent -- --pair\n"C:\\Program Files\\dotnet\\dotnet.exe" run --project .\\UpdatePilot.Agent -- --listen`;
+const configuredApiUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://YOUR-API-HOST';
+const setupCommands = `$env:UPDATEPILOT_API_URL="${configuredApiUrl}"\n.\\UpdatePilot.Agent.exe --pair\n.\\UpdatePilot.Agent.exe --listen`;
 
 export function AgentControls({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
@@ -47,7 +48,7 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
   return <section className="panel space-y-4 p-5">
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div>
-        <h2 className="font-semibold">Windows Agent</h2>
+        <h2 className="font-semibold">Windows Agent ({status.deviceName})</h2>
         <p className="mt-1 text-sm text-muted">{stateLabel}</p>
         {status.lastSeenAt && <p className="mt-1 text-xs text-muted">Last seen: {new Date(status.lastSeenAt).toLocaleString()}</p>}
       </div>
@@ -55,7 +56,7 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
         <button className="primary-button" disabled={busy || !status.online || status.activeJob} onClick={() => void action('scan')}>Scan Now</button>
         {compact ? <Link href="/settings" className="rounded-lg bg-inset px-3 py-2">Agent Settings</Link> : <>
           <button disabled={busy} className="rounded-lg bg-inset px-3 py-2" onClick={() => void action('pairing')}>Generate Pairing Code</button>
-          <button disabled={busy || !status.paired} className="rounded-lg bg-red-50 px-3 py-2 text-red-700" onClick={() => { if (window.confirm('Revoke the local agent credential and interrupt pending jobs?')) void action('revoke'); }}>Revoke Agent</button>
+          <button disabled={busy || !status.paired} className="rounded-lg bg-red-50 px-3 py-2 text-red-700" onClick={() => { if (window.confirm('Revoke the agent credential and interrupt pending jobs?')) void action('revoke'); }}>Revoke Agent</button>
         </>}
       </div>
     </div>
@@ -68,12 +69,12 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
     </div>}
     {!compact && <div className="space-y-3 text-sm leading-6 text-muted">
       <div>
-        <p className="font-medium text-foreground">Agent setup checklist</p>
+        <p className="font-medium text-foreground">Hosted agent setup checklist</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
-          <li>Generate a pairing code here.</li>
-          <li>Run the two commands below in the agent directory.</li>
-          <li>Enter the code at the prompt.</li>
-          <li>Keep the listening terminal open while updating.</li>
+          <li>Generate a short-lived, single-use pairing code here (expires in 5 minutes).</li>
+          <li>Run the commands below on your Windows PC (no inbound firewall port or router change is needed).</li>
+          <li>Enter the pairing code when prompted. The device credential is encrypted with Windows DPAPI.</li>
+          <li>Keep the agent listening while running scans, previews, verification, or approved updates.</li>
         </ol>
       </div>
       <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -83,7 +84,7 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
         </div>
         <pre className="overflow-auto bg-white p-3 text-xs">{setupCommands}</pre>
       </div>
-      <p>Machine-scope installers require an elevated agent process. Credentials stay on this Windows user account; PostgreSQL credentials are never given to the agent.</p>
+      <p>Machine-scope installers require an elevated agent process. Credentials stay encrypted on this Windows user account; PostgreSQL and user session secrets are never given to the agent.</p>
     </div>}
   </section>;
 }

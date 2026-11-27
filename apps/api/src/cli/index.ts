@@ -2,18 +2,27 @@ import { readFile, stat } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { Prisma } from "../../generated/prisma/client.js";
 import { createDatabase } from "../config/database.js";
+import { createUserAccount, signupSchema } from "../modules/auth/auth.js";
 import { contentHash, parseSnapshot } from "../modules/inventory/inventory.js";
 
 async function main() {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { file: { type: "string" }, "device-key": { type: "string" }, "device-name": { type: "string" } },
+    options: {
+      file: { type: "string" },
+      "device-key": { type: "string" },
+      "device-name": { type: "string" },
+      email: { type: "string" },
+      password: { type: "string" },
+      name: { type: "string" },
+      role: { type: "string" },
+    },
   });
   const command = positionals[0];
-  if (positionals.length !== 1 || !["check", "import", "summary"].includes(command ?? ""))
-    throw new Error("Use db:check, db:import -- --file PATH --device-key KEY --device-name NAME, or db:summary -- --device-key KEY.");
+  if (positionals.length !== 1 || !["check", "import", "summary", "user:create"].includes(command ?? ""))
+    throw new Error("Use db:check, db:import, db:summary, or user:create -- --email EMAIL --password PASS.");
   const key = values["device-key"];
-  if (command !== "check" && (!key || !/^[a-zA-Z0-9_-]{1,100}$/.test(key)))
+  if (!["check", "user:create"].includes(command ?? "") && (!key || !/^[a-zA-Z0-9_-]{1,100}$/.test(key)))
     throw new Error("Supply a stable --device-key using 1–100 letters, numbers, underscores, or hyphens.");
 
   // Validate input before opening a database connection.
@@ -33,6 +42,17 @@ async function main() {
         SELECT current_database() AS database, current_user AS "user"
       `;
       console.log("PostgreSQL connection successful:", result[0]);
+      return;
+    }
+    if (command === "user:create") {
+      const parsed = signupSchema.parse({
+        email: values.email,
+        password: values.password,
+        name: values.name,
+      });
+      const role = values.role === "admin" ? "admin" : "user";
+      const created = await createUserAccount(db, { ...parsed, role });
+      console.log("User created:", { id: created.id, email: created.email, role: created.role });
       return;
     }
     if (command === "import" && snapshot) {

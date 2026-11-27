@@ -13,9 +13,15 @@ internal static class AgentConnection
 {
     public static async Task<int> RunAsync(string mode)
     {
-        var endpoint = new Uri(Environment.GetEnvironmentVariable("UPDATEPILOT_API_URL") ?? "http://127.0.0.1:4010");
-        if (endpoint.Scheme != "http" || !new[] { "127.0.0.1", "localhost" }.Contains(endpoint.Host))
-        { Console.Error.WriteLine("Only a local loopback backend is supported."); return 1; }
+        var rawUrl = Environment.GetEnvironmentVariable("UPDATEPILOT_API_URL");
+        var allowedHost = Environment.GetEnvironmentVariable("UPDATEPILOT_ALLOWED_HOST");
+        var allowLocalhost = string.Equals(Environment.GetEnvironmentVariable("UPDATEPILOT_ALLOW_LOCALHOST"), "true", StringComparison.OrdinalIgnoreCase);
+        var endpoint = EndpointValidator.Validate(rawUrl, allowedHost, allowLocalhost);
+        if (endpoint is null)
+        {
+            Console.Error.WriteLine("Set UPDATEPILOT_API_URL to a valid HTTPS API endpoint (matching UPDATEPILOT_ALLOWED_HOST if configured).");
+            return 1;
+        }
         var state = Path.GetFullPath(Environment.GetEnvironmentVariable("UPDATEPILOT_STATE_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "UpdatePilot"));
         Directory.CreateDirectory(state);
         var credentialPath = Path.Combine(state, "credential.bin");

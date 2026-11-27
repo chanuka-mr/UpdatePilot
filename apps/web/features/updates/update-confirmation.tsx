@@ -47,6 +47,8 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
   const [verifyError, setVerifyError] = useState('');
   const [verifyBlockers, setVerifyBlockers] = useState<string[]>([]);
   const [verifying, setVerifying] = useState(false);
+  const [verifyStartedAt, setVerifyStartedAt] = useState<number | null>(null);
+  const [verifyElapsed, setVerifyElapsed] = useState(0);
   const [readiness, setReadiness] = useState<ExecutionReadiness | null>(null);
   const [readinessLoading, setReadinessLoading] = useState(true);
   const [readinessError, setReadinessError] = useState('');
@@ -85,7 +87,7 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
           return;
         }
         if (['failed', 'interrupted'].includes(body.job.state)) { setError(body.job.error || 'Preview failed. Check the agent and run a fresh scan.'); setLoading(false); return; }
-        timer = setTimeout(() => void poll(jobId), 3000);
+        timer = setTimeout(() => void poll(jobId), 1000);
       } catch (caught) { if (!stopped) { setError(caught instanceof Error ? caught.message : 'Preview unavailable.'); setLoading(false); } }
     };
     const start = async () => {
@@ -121,6 +123,15 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
   }, [recordId, readinessRevision, verification, preview?.checkedAt]);
 
   useEffect(() => {
+    if (!verifying || !verifyStartedAt) return;
+    setVerifyElapsed(Math.max(0, Math.floor((Date.now() - verifyStartedAt) / 1000)));
+    const ticker = window.setInterval(() => {
+      setVerifyElapsed(Math.max(0, Math.floor((Date.now() - verifyStartedAt) / 1000)));
+    }, 1000);
+    return () => window.clearInterval(ticker);
+  }, [verifying, verifyStartedAt]);
+
+  useEffect(() => {
     if (!verifyJob) return;
     const controller = new AbortController(); let stopped = false; let timer: ReturnType<typeof setTimeout>;
     setVerifying(true); setVerifyError(''); setVerifyBlockers([]);
@@ -144,7 +155,7 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
           setVerifyError(body.job.error === 'verify_failed' ? 'Installer verification failed. The installer was not executed.' : body.job.error || 'Installer verification failed.');
           setVerifying(false); setVerifyJob(null); return;
         }
-        timer = setTimeout(() => void poll(), 3000);
+        timer = setTimeout(() => void poll(), 1000);
       } catch (caught) { if (!stopped) { setVerifyError(caught instanceof Error ? caught.message : 'Verification unavailable.'); setVerifying(false); setVerifyJob(null); } }
     };
     void poll();
@@ -153,7 +164,7 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
 
   async function requestVerification() {
     if (!preview) return;
-    setVerification(null); setVerifyError(''); setVerifyBlockers([]); setVerifyPreviewCheckedAt(preview.checkedAt); setVerifyPhase('Requesting'); setVerifying(true);
+    setVerification(null); setVerifyError(''); setVerifyBlockers([]); setVerifyPreviewCheckedAt(preview.checkedAt); setVerifyPhase('Requesting'); setVerifyStartedAt(Date.now()); setVerifyElapsed(0); setVerifying(true);
     try {
       const response = await fetch('/api/agent/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recordId }) });
       const body = await response.json() as { error?: string; details?: { blockers?: string[] }; jobId?: string; state?: string };
@@ -180,6 +191,18 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
       router.push(`/updates/executions/${encodeURIComponent(body.executionId)}`);
     } catch (caught) { setStartError(caught instanceof Error ? caught.message : 'Cannot start the verified update.'); setStarting(false); setReadinessRevision(value => value + 1); }
   }
+
+  const verifyPercent = verification ? 100
+    : verifyError ? Math.min(90, Math.max(20, 20 + verifyElapsed * 2))
+      : !verifying ? 0
+        : verifyPhase === 'Requesting' ? 12
+          : verifyPhase === 'queued' ? 25
+            : Math.min(92, Math.round(32 + 58 * (1 - Math.exp(-verifyElapsed / 18))));
+  const verifyStageLabel = verification ? 'Verification complete'
+    : verifyError ? 'Verification failed'
+      : verifyPhase === 'running' ? 'Downloading and checking SHA-256, signature, and architecture'
+        : verifyPhase === 'queued' ? 'Waiting for paired agent to claim verification'
+          : 'Requesting verification';
 
   const identityReady = !!preview && preview.selectionValidated && !!preview.targetVersion && !!preview.installerType && !!preview.installerSha256;
   const verificationReady = !!verification && verification.signature.status === 'Valid' && verification.architectureCompatible && verification.hashMatched;
@@ -224,6 +247,23 @@ export function UpdateConfirmation({ recordId, name }: { recordId: string; name:
         <button className="primary-button" disabled={!identityReady || verifying} onClick={() => void requestVerification()}>{verifying ? `Verifying - ${verifyPhase || 'requesting'}` : verification ? 'Re-verify installer' : 'Verify installer'}</button>
         {verification && <Badge tone={verificationReady ? 'success' : 'danger'}>{verificationReady ? 'Verification evidence recorded' : 'Verification incomplete'}</Badge>}
       </div>
+      {(verifying || verification || verifyError) && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="font-medium text-foreground">{verifyStageLabel}</span>
+            <div className="flex items-center gap-3 text-muted">
+              {verifying && <span>Elapsed {verifyElapsed}s</span>}
+              <span className="font-semibold text-foreground">{verifyPercent}%</span>
+            </div>
+          </div>
+          <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Installer verification progress" aria-valuenow={verifyPercent} aria-valuemin={0} aria-valuemax={100}>
+            <div
+              className={`progress-fill h-full rounded-full ${verifying ? 'is-active bg-primary' : verification ? (verificationReady ? 'bg-green-500' : 'bg-amber-500') : 'bg-red-500'}`}
+              style={{ width: `${verifyPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
       {verifyError && <p role="alert" className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{verifyError}</p>}
       {verifyBlockers.map(code => { const info = blockerInfo(code); return <div key={code} className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-900"><strong>{info.label}.</strong> {info.description} {info.action}</div>; })}
       {verifying && <p role="status" className="mt-3 text-sm text-muted">Keep the paired agent running. The download can take several minutes; no installer is executed.</p>}

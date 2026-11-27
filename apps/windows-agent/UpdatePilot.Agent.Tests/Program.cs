@@ -121,7 +121,16 @@ var tests = new (string Name, Action Run)[]
             updateResultSample.Replace("\"status\":\"succeeded\"", "\"status\":\"restart_required\"")
         }) Require(!ValidUpdateResult(invalid));
     }),
-    ("Preview installer selection parser accepts indented winget show fields", RunPreviewSelectionTest)
+    ("Preview installer selection parser accepts indented winget show fields", RunPreviewSelectionTest),
+    ("Validates hosted HTTPS endpoints and rejects unapproved hosts or HTTP without explicit opt-in", () =>
+    {
+        Require(EndpointValidator.Validate("https://api.updatepilot.example", "api.updatepilot.example", false) is not null);
+        Require(EndpointValidator.Validate("https://evil.example", "api.updatepilot.example", false) is null);
+        Require(EndpointValidator.Validate("http://api.updatepilot.example", null, false) is null);
+        Require(EndpointValidator.Validate("http://127.0.0.1:4010", null, false) is null);
+        Require(EndpointValidator.Validate("http://127.0.0.1:4010", null, true) is not null);
+        Require(EndpointValidator.Validate("https://user:pass@api.updatepilot.example", null, false) is null);
+    }),
 };
 var failures = 0;
 foreach (var test in tests)
