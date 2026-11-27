@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  passwordHash String
+  name         String?
+  role         String     @default("user")
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
+  sessions     Session[]
+  devices      Device[]
+  auditLogs    AuditLog[]
+}
+
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  expiresAt  DateTime  @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  @@index([userId, expiresAt])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deviceId  String?  @db.Uuid
+  action    String
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
+}
+
+model Device {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String?             @db.Uuid
+  user      User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String              @unique
+  name      String
+  createdAt DateTime            @default(now()) @db.Timestamptz(3)
+  scans     InventorySnapshot[]
+  agents    AgentCredential[]
+  pairings  PairingTicket[]
+  scanJobs  ScanJob[]
+  updates   UpdateExecution[]
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model AgentCredential {
+  id          String   @id @default(uuid()) @db.Uuid
+  deviceId    String   @db.Uuid
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  tokenHash   String   @unique
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  lastSeenAt  DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  jobs        ScanJob[]
+}
+
+model PairingTicket {
+  id              String    @id @default(uuid()) @db.Uuid
+  deviceId        String    @db.Uuid
+  device          Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  createdByUserId String?   @db.Uuid
+  codeHash        String    @unique
+  expiresAt       DateTime  @db.Timestamptz(3)
+  usedAt          DateTime? @db.Timestamptz(3)
+}
+
+model ScanJob {
+  id           String           @id @default(uuid()) @db.Uuid
+  deviceId     String           @db.Uuid
+  device       Device           @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  agentId      String?          @db.Uuid
+  agent        AgentCredential? @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  state        String
+  operation    String           @default("scan")
+  request      Json?
+  preview      Json?
+  verification Json?
+  progress     Json?
+  updateExecutionId String?    @db.Uuid
+  updateExecution   UpdateExecution? @relation(fields: [updateExecutionId], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now()) @db.Timestamptz(3)
+  expiresAt    DateTime         @db.Timestamptz(3)
+  startedAt    DateTime?        @db.Timestamptz(3)
+  finishedAt   DateTime?        @db.Timestamptz(3)
+  leaseHash    String?
+  snapshotId   String?          @db.Uuid
+  resultHash   String?
+  error        String?
+
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@index([updateExecutionId])
+}
+
+model UpdateExecution {
+  id                String            @id @default(uuid()) @db.Uuid
+  deviceId          String            @db.Uuid
+  device            Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  packageId         String
+  name              String
+  installedVersion  String
+  targetVersion     String
+  sourceSnapshotId  String            @db.Uuid
+  previewJobId      String            @db.Uuid
+  verificationJobId String            @db.Uuid
+  installerType     String
+  installerSha256   String
+  scope             String
+  profile           String
+  status            String            @default("queued")
+  stage             String            @default("queued")
+  progress          Int               @default(0)
+  message           String?
+  error             String?
+  result            Json?
+  createdAt         DateTime          @default(now()) @db.Timestamptz(3)
+  startedAt         DateTime?         @db.Timestamptz(3)
+  finishedAt        DateTime?         @db.Timestamptz(3)
+  confirmedAt       DateTime?         @db.Timestamptz(3)
+  scanJobs          ScanJob[]
+
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@index([status])
+}
+
+model InventorySnapshot {
+  id           String                @id @default(uuid()) @db.Uuid
+  deviceId     String                @db.Uuid
+  device       Device                @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  scannedAt    DateTime              @db.Timestamptz(3)
+  importedAt   DateTime              @default(now()) @db.Timestamptz(3)
+  contentHash  String
+  wingetStatus String
+  warnings     Json
+  raw          Json
+  applications RegistryApplication[]
+  packages     WinGetPackage[]
+
+  @@unique([deviceId, contentHash])
+  @@unique([deviceId, scannedAt])
+  @@index([deviceId, scannedAt(sort: Desc)])
+}
+
+model RegistryApplication {
+  id               String            @id @default(uuid()) @db.Uuid
+  snapshotId       String            @db.Uuid
+  snapshot         InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  name             String
+  installedVersion String?
+  publisher        String?
+  scope            String
+  registryView     String
+  registryPath     String
+  discoverySource  String
+  matchStatus      String
+
+  @@unique([snapshotId, scope, registryView, registryPath])
+  @@index([snapshotId, name])
+}
+
+model WinGetPackage {
+  id                String            @id @default(uuid()) @db.Uuid
+  snapshotId        String            @db.Uuid
+  snapshot          InventorySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  packageId         String
+  name              String
+  installedVersion  String?
+  source            String?
+  isUpdateAvailable Boolean
+  availableVersions String[]
+  matchStatus       String
+
+  @@index([snapshotId, isUpdateAvailable])
+  @@index([snapshotId, packageId])
+}
