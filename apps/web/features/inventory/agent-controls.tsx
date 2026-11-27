@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAgentStatus } from '../../components/providers/agent-status-provider';
 
-const configuredApiUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://YOUR-API-HOST';
-const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
-const agentDownloadUrl = process.env.NEXT_PUBLIC_AGENT_DOWNLOAD_URL || '';
-const installCommand = `$env:UPDATEPILOT_API_URL="${configuredApiUrl}"\n$env:UPDATEPILOT_AGENT_URL="${agentDownloadUrl}"\nirm ${appUrl}/install.ps1 | iex`;
-const setupCommands = `$env:UPDATEPILOT_API_URL="${configuredApiUrl}"\n$env:UPDATEPILOT_ALLOWED_HOST="${configuredApiUrl.replace(/^https?:\/\//, '')}"\n.\\UpdatePilot.Agent.exe --pair\n.\\UpdatePilot.Agent.exe --listen`;
+const configuredApiUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://updatepilot-ju60.onrender.com';
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://update-pilot-eight.vercel.app';
+const agentDownloadUrl = process.env.NEXT_PUBLIC_AGENT_DOWNLOAD_URL || 'https://github.com/chanuka-mr/UpdatePilot/releases/download/UpdatePilot-Agent/UpdatePilot-Agent-win-x64.zip';
+const installerUrl = `${appUrl.replace(/\/$/, '')}/install.ps1`;
+const installCommand = `$env:UPDATEPILOT_API_URL = "${configuredApiUrl}"\n$env:UPDATEPILOT_AGENT_URL = "${agentDownloadUrl}"\nirm "${installerUrl}" | iex`;
+const pairCommand = `$env:UPDATEPILOT_API_URL = "${configuredApiUrl}"\n$env:UPDATEPILOT_ALLOWED_HOST = "${configuredApiUrl.replace(/^https?:\/\//, '')}"\n& "$env:LOCALAPPDATA\\UpdatePilot\\UpdatePilot.Agent.exe" --pair`;
+const listenCommand = `$env:UPDATEPILOT_API_URL = "${configuredApiUrl}"\n$env:UPDATEPILOT_ALLOWED_HOST = "${configuredApiUrl.replace(/^https?:\/\//, '')}"\n& "$env:LOCALAPPDATA\\UpdatePilot\\UpdatePilot.Agent.exe" --listen`;
 
 export function AgentControls({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
@@ -16,7 +18,8 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pair, setPair] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedPair, setCopiedPair] = useState(false);
+  const [copiedListen, setCopiedListen] = useState(false);
   const [copiedInstall, setCopiedInstall] = useState(false);
   const requested = useRef<string | null>(null);
 
@@ -73,28 +76,36 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
     </div>}
     {!compact && <div className="space-y-3 text-sm leading-6 text-muted">
       <div>
-        <p className="font-medium text-foreground">Hosted agent setup checklist</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5">
-          <li>Run the one-liner below in PowerShell on your Windows PC to download and install the agent.</li>
-          <li>Generate a short-lived, single-use pairing code here (expires in 5 minutes).</li>
-          <li>Enter the pairing code when prompted. The device credential is encrypted with Windows DPAPI.</li>
-          <li>Keep the agent listening while running scans, previews, verification, or approved updates.</li>
+        <p className="font-medium text-foreground">Set up this Windows computer</p>
+        <ol className="mt-2 list-decimal space-y-2 pl-5">
+          <li>Click <strong className="text-foreground">Generate Pairing Code</strong> above. Keep the code visible; it expires in 5 minutes.</li>
+          <li>On the Windows computer, open PowerShell and run <strong className="text-foreground">Step 1</strong>. It downloads the agent, installs it, and then asks for the pairing code.</li>
+          <li>Paste the pairing code into PowerShell and press Enter.</li>
+          <li>After pairing succeeds, run <strong className="text-foreground">Step 3</strong> and leave that PowerShell window open.</li>
         </ol>
       </div>
       {agentDownloadUrl && <a className="inline-flex rounded-lg bg-inset px-3 py-2 font-medium text-foreground hover:bg-slate-200" href={agentDownloadUrl}>Download agent ZIP</a>}
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <div className="flex items-center justify-between bg-inset px-3 py-2 text-xs font-medium text-foreground">
-          <span>Step 1 — Install agent (PowerShell one-liner)</span>
+          <span>Step 1 — Download, install, and pair</span>
           <button className="text-primary" onClick={() => { void navigator.clipboard.writeText(installCommand); setCopiedInstall(true); }}>{copiedInstall ? 'Copied' : 'Copy'}</button>
         </div>
         <pre className="overflow-auto bg-white p-3 text-xs">{installCommand}</pre>
       </div>
+      <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950"><strong>Copy commands exactly.</strong> Use <code>https://</code>, never <code>https\://</code>. The installer address ends in <code>/install.ps1</code>; do not use the website home-page address.</p>
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <div className="flex items-center justify-between bg-inset px-3 py-2 text-xs font-medium text-foreground">
-          <span>Step 2 — Pair and start (if already installed)</span>
-          <button className="text-primary" onClick={() => { void navigator.clipboard.writeText(setupCommands); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</button>
+          <span>Step 2 — Pair an agent that is already installed</span>
+          <button className="text-primary" onClick={() => { void navigator.clipboard.writeText(pairCommand); setCopiedPair(true); }}>{copiedPair ? 'Copied' : 'Copy'}</button>
         </div>
-        <pre className="overflow-auto bg-white p-3 text-xs">{setupCommands}</pre>
+        <pre className="overflow-auto bg-white p-3 text-xs">{pairCommand}</pre>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-slate-200">
+        <div className="flex items-center justify-between bg-inset px-3 py-2 text-xs font-medium text-foreground">
+          <span>Step 3 — Start the agent listener after pairing</span>
+          <button className="text-primary" onClick={() => { void navigator.clipboard.writeText(listenCommand); setCopiedListen(true); }}>{copiedListen ? 'Copied' : 'Copy'}</button>
+        </div>
+        <pre className="overflow-auto bg-white p-3 text-xs">{listenCommand}</pre>
       </div>
       <p>Machine-scope installers require an elevated agent process. Credentials stay encrypted on this Windows user account; PostgreSQL and user session secrets are never given to the agent.</p>
     </div>}
