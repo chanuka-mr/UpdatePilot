@@ -5,7 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useAgentStatus } from '../../components/providers/agent-status-provider';
 
 const configuredApiUrl = process.env.NEXT_PUBLIC_AGENT_API_URL || 'https://YOUR-API-HOST';
-const setupCommands = `$env:UPDATEPILOT_API_URL="${configuredApiUrl}"\n.\\UpdatePilot.Agent.exe --pair\n.\\UpdatePilot.Agent.exe --listen`;
+const appUrl = process.env.NEXT_PUBLIC_APP_URL || '';
+const agentDownloadUrl = process.env.NEXT_PUBLIC_AGENT_DOWNLOAD_URL || '';
+const installCommand = `$env:UPDATEPILOT_API_URL="${configuredApiUrl}"\n$env:UPDATEPILOT_AGENT_URL="${agentDownloadUrl}"\nirm ${appUrl}/install.ps1 | iex`;
+const setupCommands = `$env:UPDATEPILOT_API_URL="${configuredApiUrl}"\n$env:UPDATEPILOT_ALLOWED_HOST="${configuredApiUrl.replace(/^https?:\/\//, '')}"\n.\\UpdatePilot.Agent.exe --pair\n.\\UpdatePilot.Agent.exe --listen`;
 
 export function AgentControls({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
@@ -14,6 +17,7 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [pair, setPair] = useState<{ code: string; expiresAt: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedInstall, setCopiedInstall] = useState(false);
   const requested = useRef<string | null>(null);
 
   useEffect(() => {
@@ -71,15 +75,23 @@ export function AgentControls({ compact = false }: { compact?: boolean }) {
       <div>
         <p className="font-medium text-foreground">Hosted agent setup checklist</p>
         <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Run the one-liner below in PowerShell on your Windows PC to download and install the agent.</li>
           <li>Generate a short-lived, single-use pairing code here (expires in 5 minutes).</li>
-          <li>Run the commands below on your Windows PC (no inbound firewall port or router change is needed).</li>
           <li>Enter the pairing code when prompted. The device credential is encrypted with Windows DPAPI.</li>
           <li>Keep the agent listening while running scans, previews, verification, or approved updates.</li>
         </ol>
       </div>
+      {agentDownloadUrl && <a className="inline-flex rounded-lg bg-inset px-3 py-2 font-medium text-foreground hover:bg-slate-200" href={agentDownloadUrl}>Download agent ZIP</a>}
       <div className="overflow-hidden rounded-xl border border-slate-200">
         <div className="flex items-center justify-between bg-inset px-3 py-2 text-xs font-medium text-foreground">
-          <span>PowerShell commands</span>
+          <span>Step 1 — Install agent (PowerShell one-liner)</span>
+          <button className="text-primary" onClick={() => { void navigator.clipboard.writeText(installCommand); setCopiedInstall(true); }}>{copiedInstall ? 'Copied' : 'Copy'}</button>
+        </div>
+        <pre className="overflow-auto bg-white p-3 text-xs">{installCommand}</pre>
+      </div>
+      <div className="overflow-hidden rounded-xl border border-slate-200">
+        <div className="flex items-center justify-between bg-inset px-3 py-2 text-xs font-medium text-foreground">
+          <span>Step 2 — Pair and start (if already installed)</span>
           <button className="text-primary" onClick={() => { void navigator.clipboard.writeText(setupCommands); setCopied(true); }}>{copied ? 'Copied' : 'Copy'}</button>
         </div>
         <pre className="overflow-auto bg-white p-3 text-xs">{setupCommands}</pre>

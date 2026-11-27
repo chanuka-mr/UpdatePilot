@@ -23,8 +23,19 @@ This guide covers deploying UpdatePilot to **Vercel** (`apps/web`) and **Railway
      - `BACKEND_API_TOKEN` = exact same 64-char secret as the API
      - `NEXT_PUBLIC_APP_URL` = `https://<your-vercel-domain>`
      - `NEXT_PUBLIC_AGENT_API_URL` = `https://<your-api-host>`
+     - `NEXT_PUBLIC_AGENT_DOWNLOAD_URL` = public HTTPS URL for `UpdatePilot-Agent-win-x64.zip`
 
-3. **Create Your Private Milestone 1 Account**
+3. **Publish the Windows agent package**
+   - Build the self-contained agent and package the entire publish output (not just the `.exe`):
+     ```powershell
+     cd apps/windows-agent
+     dotnet publish .\UpdatePilot.Agent\UpdatePilot.Agent.csproj -c Release -r win-x64 --self-contained true -o .\publish
+     Compress-Archive -Path .\publish\* -DestinationPath .\UpdatePilot-Agent-win-x64.zip -Force
+     ```
+   - Upload `UpdatePilot-Agent-win-x64.zip` to public object storage or a release-download service. The ZIP must have `UpdatePilot.Agent.exe` at its top level.
+   - Set its public HTTPS URL as `NEXT_PUBLIC_AGENT_DOWNLOAD_URL` in Vercel and redeploy. Users can then download the ZIP or use the install command shown on Settings; no access to your development folder is needed.
+
+4. **Create Your Private Milestone 1 Account**
    - Run once against your production database (via Railway/Render shell or local `.env` pointing to the DB):
      ```bash
      cd apps/api
