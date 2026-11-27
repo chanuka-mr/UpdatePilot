@@ -6,7 +6,7 @@ This guide covers deploying UpdatePilot to **Vercel** (`apps/web`) and **Railway
 
 1. **Managed PostgreSQL + API (`apps/api`) on Railway or Render**
    - Create a managed PostgreSQL database and copy its `DATABASE_URL` (with `sslmode=require` in production).
-   - Deploy `apps/api` using [`apps/api/Dockerfile`](../apps/api/Dockerfile) (or Node 22 build: `npm ci && npx prisma generate`, start: `npx prisma migrate deploy && npm start`).
+   - Deploy `apps/api` with Node 22: build with `npm ci && npx prisma generate`, start with `npx prisma migrate deploy && npm start`.
    - Set environment variables on the API service:
      - `DATABASE_URL` = managed PostgreSQL connection string
      - `BACKEND_API_TOKEN` = random 64-char hex secret (`openssl rand -hex 32`)
